@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, ScrollView, Image,
   StyleSheet, Alert, Animated, Dimensions,
 } from 'react-native';
-import { api } from '../services/api';
+import { api } from '../../services/api';
 
 const { width } = Dimensions.get('window');
 const CARD_SIZE = (width - 48 - 12) / 3; // 3열 그리드

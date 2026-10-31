@@ -8,11 +8,14 @@ const userRoutes = require('./routes/users');
 const tasteRoutes = require('./routes/tastes');
 const matchingRoutes = require('./routes/matching');
 const chatRoutes = require('./routes/chat');
-const clubRoutes = require('./routes/clubs');
+const loungeRoutes = require('./routes/lounges');
 const reportRoutes = require('./routes/reports');
 const publicRoutes = require('./routes/public');
-const { setupSocket } = require('./services/socket');
-const { authMiddleware, membersOnly } = require('./middleware/auth');
+const guestRoutes = require('./routes/guest');
+const questionRoutes = require('./routes/questions');
+const { setupSocket } = require('./socket');
+const optionalAuth = require('./middleware/optionalAuth');
+const memberAuth = require('./middleware/memberAuth');
 
 const app = express();
 const server = http.createServer(app);
@@ -26,16 +29,19 @@ app.use(express.json());
 // Public routes (비로그인 접근 가능)
 app.use('/api/auth', authRoutes);
 app.use('/api/public', publicRoutes);
+app.use('/api/guest', guestRoutes); // #5
 
 // Protected routes (로그인 + 게스트 모두 접근 가능)
-app.use('/api/users', authMiddleware, userRoutes);
-app.use('/api/tastes', authMiddleware, tasteRoutes);
-app.use('/api/chat', authMiddleware, chatRoutes);
-app.use('/api/clubs', authMiddleware, clubRoutes);
+app.use('/api/users', optionalAuth, userRoutes);
+app.use('/api/tastes', optionalAuth, tasteRoutes);
+app.use('/api/chat', optionalAuth, chatRoutes);
+app.use('/api/lounges', optionalAuth, loungeRoutes);
+app.use('/api/questions', optionalAuth, questionRoutes); // #15
 
 // Members only (회원 전용 - 게스트 차단)
-app.use('/api/matching', authMiddleware, membersOnly, matchingRoutes);
-app.use('/api/reports', authMiddleware, membersOnly, reportRoutes);
+// TODO(#13, #16): PRD상 Guest도 매칭·신고 가능 → optionalAuth로 전환
+app.use('/api/matching', memberAuth, matchingRoutes);
+app.use('/api/reports', memberAuth, reportRoutes);
 
 // Socket.io
 setupSocket(io);

@@ -22,7 +22,7 @@ router.get('/rooms', async (req, res) => {
 
     // 동호회 채팅방
     const clubRooms = await db.query(
-      `SELECT cr.id, cr.type, cr.created_at, c.name as club_name,
+      `SELECT cr.id, cr.type, cr.created_at, c.name as lounge_name,
         (SELECT content FROM messages WHERE chat_room_id = cr.id ORDER BY created_at DESC LIMIT 1) as last_message,
         (SELECT created_at FROM messages WHERE chat_room_id = cr.id ORDER BY created_at DESC LIMIT 1) as last_message_at
        FROM chat_rooms cr
@@ -33,7 +33,7 @@ router.get('/rooms', async (req, res) => {
       [req.userId]
     );
 
-    res.json({ direct: directRooms.rows, clubs: clubRooms.rows });
+    res.json({ direct: directRooms.rows, lounges: clubRooms.rows });
   } catch (err) {
     res.status(500).json({ error: '서버 오류가 발생했습니다' });
   }

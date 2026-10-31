@@ -1,10 +1,11 @@
+// 라운지 API (기존 동호회 API) — DB 테이블(clubs, club_members)은 #3에서 lounges로 변경
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
 
 const router = express.Router();
 
-// 동호회 목록 (카테고리 필터 가능)
+// 라운지 목록 (카테고리 필터 가능)
 router.get('/', async (req, res) => {
   try {
     const { category_id, search } = req.query;
@@ -35,7 +36,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 동호회 상세
+// 라운지 상세
 router.get('/:id', async (req, res) => {
   try {
     const club = await db.query(
@@ -48,7 +49,7 @@ router.get('/:id', async (req, res) => {
       [req.params.id]
     );
     if (club.rows.length === 0) {
-      return res.status(404).json({ error: '동호회를 찾을 수 없습니다' });
+      return res.status(404).json({ error: '라운지를 찾을 수 없습니다' });
     }
 
     const members = await db.query(
@@ -64,18 +65,18 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// 동호회 생성
+// 라운지 생성
 router.post('/', async (req, res) => {
   try {
     const { name, description, category_id, max_members } = req.body;
 
     if (!name || !category_id) {
-      return res.status(400).json({ error: '동호회 이름과 카테고리를 입력해주세요' });
+      return res.status(400).json({ error: '라운지 이름과 카테고리를 입력해주세요' });
     }
 
     const clubId = uuidv4();
 
-    // 동호회 생성
+    // 라운지 생성
     await db.query(
       `INSERT INTO clubs (id, name, description, category_id, owner_id, max_members) VALUES ($1, $2, $3, $4, $5, $6)`,
       [clubId, name, description || '', category_id, req.userId, max_members || 50]
@@ -100,14 +101,14 @@ router.post('/', async (req, res) => {
   }
 });
 
-// 동호회 가입
+// 라운지 가입
 router.post('/:id/join', async (req, res) => {
   try {
     const clubId = req.params.id;
 
     // 인원 확인
     const club = await db.query('SELECT max_members FROM clubs WHERE id = $1', [clubId]);
-    if (club.rows.length === 0) return res.status(404).json({ error: '동호회를 찾을 수 없습니다' });
+    if (club.rows.length === 0) return res.status(404).json({ error: '라운지를 찾을 수 없습니다' });
 
     const memberCount = await db.query('SELECT COUNT(*) FROM club_members WHERE club_id = $1', [clubId]);
     if (parseInt(memberCount.rows[0].count) >= club.rows[0].max_members) {
@@ -125,7 +126,7 @@ router.post('/:id/join', async (req, res) => {
   }
 });
 
-// 동호회 탈퇴
+// 라운지 탈퇴
 router.delete('/:id/leave', async (req, res) => {
   try {
     await db.query(

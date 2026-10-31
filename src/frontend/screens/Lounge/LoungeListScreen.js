@@ -1,36 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, FlatList, TextInput, StyleSheet } from 'react-native';
-import { api } from '../services/api';
+import { api } from '../../services/api';
 
-export default function ClubListScreen({ navigation }) {
-  const [clubs, setClubs] = useState([]);
+export default function LoungeListScreen({ navigation }) {
+  const [lounges, setLounges] = useState([]);
   const [search, setSearch] = useState('');
 
-  const loadClubs = () => {
+  const loadLounges = () => {
     const params = search ? { search } : {};
-    api.getClubs(params).then(setClubs).catch(() => {});
+    api.getLounges(params).then(setLounges).catch(() => {});
   };
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', loadClubs);
+    const unsubscribe = navigation.addListener('focus', loadLounges);
     return unsubscribe;
   }, [navigation]);
 
   useEffect(() => {
-    const timer = setTimeout(loadClubs, 300);
+    const timer = setTimeout(loadLounges, 300);
     return () => clearTimeout(timer);
   }, [search]);
 
   const renderItem = ({ item }) => (
     <TouchableOpacity
       style={styles.card}
-      onPress={() => navigation.navigate('ClubDetail', { clubId: item.id })}
+      onPress={() => navigation.navigate('LoungeChat', { loungeId: item.id })}
     >
       <View style={styles.cardHeader}>
         <Text style={styles.icon}>{item.category_icon}</Text>
         <View style={styles.cardInfo}>
-          <Text style={styles.clubName}>{item.name}</Text>
-          <Text style={styles.clubCategory}>{item.category_name}</Text>
+          <Text style={styles.loungeName}>{item.name}</Text>
+          <Text style={styles.loungeCategory}>{item.category_name}</Text>
         </View>
         <Text style={styles.memberCount}>{item.member_count}명</Text>
       </View>
@@ -42,25 +42,20 @@ export default function ClubListScreen({ navigation }) {
     <View style={styles.container}>
       <TextInput
         style={styles.searchInput}
-        placeholder="동호회 검색..."
+        placeholder="라운지 검색..."
         value={search}
         onChangeText={setSearch}
       />
 
       <FlatList
-        data={clubs}
+        data={lounges}
         renderItem={renderItem}
         keyExtractor={item => item.id}
-        contentContainerStyle={{ paddingBottom: 80 }}
-        ListEmptyComponent={<Text style={styles.empty}>동호회가 없습니다. 첫 동호회를 만들어보세요!</Text>}
+        contentContainerStyle={{ paddingBottom: 24 }}
+        ListEmptyComponent={<Text style={styles.empty}>아직 열린 라운지가 없어요.</Text>}
       />
 
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => navigation.navigate('ClubCreate')}
-      >
-        <Text style={styles.fabText}>+ 동호회 만들기</Text>
-      </TouchableOpacity>
+      {/* 라운지 생성은 V2 (src/frontend/_legacy/screens/ClubCreateScreen.js 참고) */}
     </View>
   );
 }
@@ -78,15 +73,9 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   icon: { fontSize: 28 },
   cardInfo: { flex: 1, marginLeft: 10 },
-  clubName: { fontSize: 17, fontWeight: 'bold', color: '#333' },
-  clubCategory: { fontSize: 13, color: '#888' },
+  loungeName: { fontSize: 17, fontWeight: 'bold', color: '#333' },
+  loungeCategory: { fontSize: 13, color: '#888' },
   memberCount: { fontSize: 14, color: '#6C5CE7', fontWeight: 'bold' },
   description: { fontSize: 14, color: '#666', lineHeight: 20 },
   empty: { textAlign: 'center', marginTop: 60, color: '#888', fontSize: 15 },
-  fab: {
-    position: 'absolute', bottom: 20, left: 16, right: 16,
-    backgroundColor: '#6C5CE7', borderRadius: 14, padding: 16, alignItems: 'center',
-    shadowColor: '#6C5CE7', shadowOpacity: 0.3, shadowRadius: 10, elevation: 5,
-  },
-  fabText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });

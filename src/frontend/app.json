@@ -9,22 +9,20 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#6C5CE7"
+      "backgroundColor": "#101230"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.orbit.app",
-      "buildNumber": "1",
-      "infoPlist": {
-        "NSCameraUsageDescription": "프로필 사진 촬영을 위해 카메라 접근이 필요합니다",
-        "NSPhotoLibraryUsageDescription": "프로필 사진 선택을 위해 사진 접근이 필요합니다"
-      }
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#6C5CE7"
+        "backgroundColor": "#101230"
       },
       "package": "com.orbit.app"
     },
@@ -32,11 +30,8 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro",
       "output": "single",
-      "name": "Orbit - 취향 기반 소셜 매칭"
+      "name": "Orbit - 취향 기반 익명 소셜 채팅"
     },
-    "plugins": [
-      "expo-router"
-    ],
     "extra": {
       "eas": {
         "projectId": "your-project-id"

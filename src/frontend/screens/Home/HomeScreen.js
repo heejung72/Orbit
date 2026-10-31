@@ -4,9 +4,9 @@ import {
   StyleSheet, Alert, Dimensions, Animated, Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { api } from '../services/api';
-import VennDiagram from '../components/VennDiagram';
-import RadarChart from '../components/RadarChart';
+import { api } from '../../services/api';
+import VennDiagram from '../../_legacy/components/VennDiagram';
+import RadarChart from '../../_legacy/components/RadarChart';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.75;
@@ -15,7 +15,7 @@ const CARD_MARGIN = 10;
 export default function HomeScreen({ isGuest }) {
   const navigation = useNavigation();
   const [matches, setMatches] = useState([]);
-  const [popularClubs, setPopularClubs] = useState([]);
+  const [popularLounges, setPopularLounges] = useState([]);
   const [tastes, setTastes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState(null);
@@ -30,7 +30,7 @@ export default function HomeScreen({ isGuest }) {
     try {
       // 공개 홈 데이터 (모든 사용자)
       const homeData = await api.getPublicHome();
-      setPopularClubs(homeData.popularClubs || []);
+      setPopularLounges(homeData.popularLounges || []);
       setTastes(homeData.tastes || []);
 
       // 매칭 추천은 회원만
@@ -209,22 +209,22 @@ export default function HomeScreen({ isGuest }) {
         )
       ))}
 
-      {/* 인기 동호회 (모든 사용자) */}
-      {popularClubs.length > 0 && (
+      {/* 인기 라운지 (모든 사용자) */}
+      {popularLounges.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>인기 동호회</Text>
-          {popularClubs.slice(0, 5).map(club => (
+          <Text style={styles.sectionTitle}>인기 라운지</Text>
+          {popularLounges.slice(0, 5).map(lounge => (
             <TouchableOpacity
-              key={club.id}
-              style={styles.clubCard}
-              onPress={() => navigation.navigate('ClubDetail', { clubId: club.id })}
+              key={lounge.id}
+              style={styles.loungeCard}
+              onPress={() => navigation.navigate('LoungeChat', { loungeId: lounge.id })}
             >
-              <View style={styles.clubIcon}>
-                <Text style={styles.clubIconText}>{club.category_icon}</Text>
+              <View style={styles.loungeIcon}>
+                <Text style={styles.loungeIconText}>{lounge.category_icon}</Text>
               </View>
-              <View style={styles.clubInfo}>
-                <Text style={styles.clubName}>{club.name}</Text>
-                <Text style={styles.clubMeta}>{club.category_name} · {club.member_count}명</Text>
+              <View style={styles.loungeInfo}>
+                <Text style={styles.loungeName}>{lounge.name}</Text>
+                <Text style={styles.loungeMeta}>{lounge.category_name} · {lounge.member_count}명</Text>
               </View>
             </TouchableOpacity>
           ))}
@@ -299,20 +299,20 @@ const styles = StyleSheet.create({
   },
   tasteName: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
 
-  // 동호회 카드
-  clubCard: {
+  // 라운지 카드
+  loungeCard: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
     borderRadius: 12, padding: 14, marginBottom: 8, marginHorizontal: 8,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
   },
-  clubIcon: {
+  loungeIcon: {
     width: 44, height: 44, borderRadius: 12, backgroundColor: '#F0EDFF',
     justifyContent: 'center', alignItems: 'center',
   },
-  clubIconText: { fontSize: 22 },
-  clubInfo: { marginLeft: 12, flex: 1 },
-  clubName: { fontSize: 16, fontWeight: 'bold', color: '#333' },
-  clubMeta: { fontSize: 13, color: '#888', marginTop: 2 },
+  loungeIconText: { fontSize: 22 },
+  loungeInfo: { marginLeft: 12, flex: 1 },
+  loungeName: { fontSize: 16, fontWeight: 'bold', color: '#333' },
+  loungeMeta: { fontSize: 13, color: '#888', marginTop: 2 },
 
   // 모달
   modalOverlay: {

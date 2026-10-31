@@ -1,54 +1,54 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, FlatList, StyleSheet, Alert } from 'react-native';
-import { api } from '../services/api';
+import { api } from '../../services/api';
 
-export default function ClubDetailScreen({ route, navigation }) {
-  const { clubId } = route.params;
-  const [club, setClub] = useState(null);
+export default function LoungeChatScreen({ route, navigation }) {
+  const { loungeId } = route.params;
+  const [lounge, setLounge] = useState(null);
 
   useEffect(() => {
-    api.getClub(clubId).then(data => {
-      setClub(data);
+    api.getLounge(loungeId).then(data => {
+      setLounge(data);
       navigation.setOptions({ title: data.name });
     }).catch(() => {});
-  }, [clubId]);
+  }, [loungeId]);
 
   const handleJoin = async () => {
     try {
-      await api.joinClub(clubId);
-      Alert.alert('가입 완료', '동호회에 가입되었습니다!');
-      api.getClub(clubId).then(setClub);
+      await api.joinLounge(loungeId);
+      Alert.alert('참여 완료', '라운지에 참여했어요!');
+      api.getLounge(loungeId).then(setLounge);
     } catch (err) {
       Alert.alert('오류', err.message);
     }
   };
 
-  if (!club) return <Text style={styles.loading}>로딩 중...</Text>;
+  if (!lounge) return <Text style={styles.loading}>로딩 중...</Text>;
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.name}>{club.name}</Text>
-        <Text style={styles.category}>{club.category_name} · {club.member_count}명</Text>
-        <Text style={styles.description}>{club.description}</Text>
-        <Text style={styles.owner}>모임장: {club.owner_nickname}</Text>
+        <Text style={styles.name}>{lounge.name}</Text>
+        <Text style={styles.category}>{lounge.category_name} · {lounge.member_count}명</Text>
+        <Text style={styles.description}>{lounge.description}</Text>
+        <Text style={styles.owner}>개설자: {lounge.owner_nickname}</Text>
       </View>
 
       <View style={styles.actions}>
         <TouchableOpacity style={styles.joinButton} onPress={handleJoin}>
-          <Text style={styles.joinText}>가입하기</Text>
+          <Text style={styles.joinText}>참여하기</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.chatButton}
-          onPress={() => navigation.navigate('ChatRoom', { roomId: club.id, title: club.name })}
+          onPress={() => navigation.navigate('ChatRoom', { roomId: lounge.id, title: lounge.name })}
         >
           <Text style={styles.chatText}>그룹 채팅</Text>
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.sectionTitle}>멤버 ({club.members?.length || 0})</Text>
+      <Text style={styles.sectionTitle}>멤버 ({lounge.members?.length || 0})</Text>
       <FlatList
-        data={club.members || []}
+        data={lounge.members || []}
         keyExtractor={item => item.id}
         renderItem={({ item }) => (
           <View style={styles.member}>
@@ -56,7 +56,7 @@ export default function ClubDetailScreen({ route, navigation }) {
               <Text style={styles.memberAvatarText}>{item.nickname[0]}</Text>
             </View>
             <Text style={styles.memberName}>{item.nickname}</Text>
-            {item.role === 'owner' && <Text style={styles.badge}>모임장</Text>}
+            {item.role === 'owner' && <Text style={styles.badge}>개설자</Text>}
           </View>
         )}
       />

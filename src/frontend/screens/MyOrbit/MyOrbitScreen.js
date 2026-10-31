@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from '../services/api';
-import { disconnectSocket } from '../services/socket';
-import RadarChart from '../components/RadarChart';
+import { api } from '../../services/api';
+import { disconnectSocket } from '../../services/socket';
+import RadarChart from '../../_legacy/components/RadarChart';
 
-export default function ProfileScreen({ navigation }) {
+export default function MyOrbitScreen({ navigation, onLogout }) {
   const [profile, setProfile] = useState(null);
   const [editing, setEditing] = useState(false);
   const [nickname, setNickname] = useState('');
@@ -32,9 +32,8 @@ export default function ProfileScreen({ navigation }) {
 
   const handleLogout = async () => {
     disconnectSocket();
-    await AsyncStorage.multiRemove(['token', 'user']);
-    // 앱을 다시 시작하면 로그인 화면으로 이동
-    Alert.alert('로그아웃', '앱을 다시 시작해주세요');
+    await AsyncStorage.multiRemove(['token', 'user', 'isGuest']);
+    onLogout?.();
   };
 
   if (!profile) return <Text style={styles.loading}>로딩 중...</Text>;
