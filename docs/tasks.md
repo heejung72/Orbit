@@ -12,7 +12,7 @@
 | 1 | [DOCS] 프로젝트 재정비 및 Git/브랜치 전략 세팅 | `docs/#1-project-setup` | - | ✅ |
 | 2 | [REFACTOR] 디렉토리 구조 개편 | `refactor/#2-directory-structure` | 1 | ✅ |
 | 3 | [REFACTOR] 스키마 재설계 | `refactor/#3-db-schema` | 2 | ✅ |
-| 4 | [FEAT] 회원 인증 | `feat/#4-member-auth` | 3 | ⬜ |
+| 4 | [FEAT] 회원 인증 | `feat/#4-member-auth` | 5 | 🟨 |
 | 5 | [FEAT] Guest 세션 | `feat/#5-guest-session` | 3 | 🟨 |
 | 6 | [FEAT] Welcome 화면 | `feat/#6-welcome` | 4, 5 | ⬜ |
 | 7 | [FEAT] 취향 시스템 | `feat/#7-taste-system` | 4, 5 | ⬜ |
@@ -109,12 +109,23 @@
 **완료 기준:** 빈 DB에서 migrate + seed가 한 번에 성공하고, 기존 화면이 새 스키마로 동작한다.
 
 ## #4 [FEAT] 회원 인증
-- [ ] `POST /auth/register` (email, password, nickname, avatarId) — bcrypt
-- [ ] `POST /auth/login` → JWT
-- [ ] `GET /auth/me`
-- [ ] `memberAuth`, `optionalAuth` 미들웨어 (`req.actor`)
-- [ ] Login / Register 화면, `AuthContext`, SecureStore 저장
-- [ ] 입력 검증(이메일 형식, 비밀번호 8자 이상, 닉네임 2~12자)
+**선행:** #5 위에서 진행 (`feat/#4-member-auth`는 `feat/#5-guest-session` 기반, #5 머지 후 PR)
+> 가입·로그인 API, bcrypt, JWT, memberAuth/optionalAuth, `/auth/me`, SecureStore 저장은 #3·#5에서 완료
+### Backend
+- [x] 가입 검증: 이메일 형식·trim·**소문자 정규화**, 비밀번호 8자~72바이트(bcrypt 한계), 닉네임 2~12자(trim), avatar_id 양의 정수, 비문자열 400
+- [x] 로그인 검증: 비문자열·누락 400, 이메일 소문자 정규화
+- [x] 중복 확인을 INSERT의 UNIQUE에 맡김 → 동시 가입도 23505 → 409, 없는 캐릭터 23503 → 400
+- [x] `GET /api/public/avatars`
+### Frontend
+- [x] 가입 화면: 캐릭터 선택, 서버와 같은 검증, 가입 후 바로 입장 (`saveMemberSession`: Guest 흔적 정리)
+- [x] 회원 토큰 401 `UNAUTHORIZED` → 세션 정리 후 로그인 화면 (Guest 만료와 같은 콜백)
+- [x] 앱 시작 시 `/auth/me`로 서버 계정·세션 확인 (DB 초기화 후 남은 토큰 처리)
+- [ ] 빈 `context/AuthContext.js` 삭제 (`git rm`) — props로 충분, 필요해지면 #12
+### 확인
+- [x] `tests/auth.e2e.js` (`npm run test:auth`) 9개 + `test:guest` 8개 통과, 기존 시나리오 회귀 없음(의도 변경 제외), 웹 빌드
+- [x] 셀프 리뷰(ponytail-review): Must 0 / Should 1 반영(앱 시작 시 /auth/me) / Nice 1(AuthContext 삭제)
+### 하지 않은 것
+- 로그인 Rate Limit → #16 / 비밀번호 찾기·이메일 인증 → MVP 밖 / 가입 시 Guest 데이터 이전 → #14
 
 ## #5 [FEAT] Guest 세션
 **설계:** [system_design.md §3·§4](./system_design.md) · GitHub 이슈 #5 본문
