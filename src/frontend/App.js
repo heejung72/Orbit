@@ -13,11 +13,17 @@ export default function App() {
   useEffect(() => {
     setOnSessionExpired(() => setAuthState('loggedOut'));
     (async () => {
-      const isMember = !!(await secureStorage.get('token'));
-      const guestToken = await secureStorage.get('guestToken');
-      const expiresAt = Date.parse(await AsyncStorage.getItem('guestExpiresAt'));
-      if (!isMember && !(guestToken && expiresAt > Date.now())) {
-        await clearSession(); // 만료됐거나 반쯤 남은 세션 정리
+      let isMember = false;
+      try {
+        isMember = !!(await secureStorage.get('token'));
+        const guestToken = await secureStorage.get('guestToken');
+        const expiresAt = Date.parse(await AsyncStorage.getItem('guestExpiresAt'));
+        if (!isMember && !(guestToken && expiresAt > Date.now())) {
+          await clearSession(); // 만료됐거나 반쯤 남은 세션 정리
+          return setAuthState('loggedOut');
+        }
+      } catch (err) {
+        console.warn('세션 확인 실패:', err.message); // 저장소 오류여도 로그인 화면은 보여준다
         return setAuthState('loggedOut');
       }
       // 서버에서 계정·세션이 사라졌는지 확인 (DB 초기화, Redis 정리 등)

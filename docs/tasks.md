@@ -13,7 +13,7 @@
 | 2 | [REFACTOR] 디렉토리 구조 개편 | `refactor/#2-directory-structure` | 1 | ✅ |
 | 3 | [REFACTOR] 스키마 재설계 | `refactor/#3-db-schema` | 2 | ✅ |
 | 4 | [FEAT] 회원 인증 | `feat/#4-member-auth` | 5 | 🟨 |
-| 5 | [FEAT] Guest 세션 | `feat/#5-guest-session` | 3 | 🟨 |
+| 5 | [FEAT] Guest 세션 | `feat/#5-guest-session` | 3 | ✅ |
 | 6 | [FEAT] Welcome 화면 | `feat/#6-welcome` | 4, 5 | ⬜ |
 | 7 | [FEAT] 취향 시스템 | `feat/#7-taste-system` | 4, 5 | ⬜ |
 | 8 | [FEAT] Orbit Dashboard (Home) | `feat/#8-dashboard` | 7, 9 | ⬜ |
@@ -109,7 +109,7 @@
 **완료 기준:** 빈 DB에서 migrate + seed가 한 번에 성공하고, 기존 화면이 새 스키마로 동작한다.
 
 ## #4 [FEAT] 회원 인증
-**선행:** #5 위에서 진행 (`feat/#4-member-auth`는 `feat/#5-guest-session` 기반, #5 머지 후 PR)
+**선행:** #5 (머지 완료, #5 리뷰 반영분까지 병합)
 > 가입·로그인 API, bcrypt, JWT, memberAuth/optionalAuth, `/auth/me`, SecureStore 저장은 #3·#5에서 완료
 ### Backend
 - [x] 가입 검증: 이메일 형식·trim·**소문자 정규화**, 비밀번호 8자~72바이트(bcrypt 한계), 닉네임 2~12자(trim), avatar_id 양의 정수, 비문자열 400

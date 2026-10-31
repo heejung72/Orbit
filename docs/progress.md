@@ -3,11 +3,9 @@
 > **작업을 다시 시작할 때 이 파일부터 읽는다.** 작업이 끝날 때마다 갱신한다.
 
 ## 🔖 지금 상태
-- **현재 이슈:** #4 [FEAT] 회원 인증 — `feat/#4-member-auth` (**#5 브랜치 위에 쌓음**)
-- **대기 중:** #5 PR 리뷰·머지 → 그 뒤 #4 PR 생성
-- **상태:** #4 구현·셀프 리뷰 완료 → #5 머지 대기
-- **다음 할 일:** #5 머지 → #4 PR → 머지 → `feat/#6-welcome` 또는 `feat/#9-tab-navigation`
-- **#5에 수정이 생기면:** #4 브랜치에서 `git merge "feat/#5-guest-session"`
+- **현재 이슈:** #4 [FEAT] 회원 인증 — `feat/#4-member-auth`
+- **상태:** 구현·셀프 리뷰 완료, #5 머지분 병합 완료 → PR 리뷰
+- **다음 할 일:** #4 머지 → `feat/#6-welcome` 또는 `feat/#9-tab-navigation` → 첫 커밋으로 #4 완료 반영
 - **로컬 준비물:** PostgreSQL + Redis, 테스트는 `npm run test:auth`, `npm run test:guest` (서버 실행 중)
 
 ## ✅ 완료한 이슈
@@ -16,6 +14,7 @@
 | 1 | [DOCS] 프로젝트 재정비 및 Git/브랜치 전략 세팅 | #18 | 2026-10-31 |
 | 2 | [REFACTOR] 디렉토리 구조 개편 | #19 | 2026-10-31 |
 | 3 | [REFACTOR] 스키마 재설계 | #20 | 2026-10-31 |
+| 5 | [FEAT] Guest 세션 | #21 | 2026-10-31 |
 
 ## 📌 결정 로그
 | 날짜 | 결정 | 근거/비고 |
@@ -74,6 +73,6 @@
 - 임시 API 형태(#3에서 유지): `POST /matching/find`, `PUT /users/me/tastes` 등은 각 기능 이슈(#7, #13)에서 api_spec 형태로 교체
 - 메시지(REST·소켓)는 `is_mine`만 내려줌(실제 user_id 제거, PR #20). 매칭 후보 `id`는 아직 실제 user_id → #13에서 익명 참조로 교체
 - 소켓 `send_message` Rate Limit 없음 → #16에서 Redis 기반으로 추가
-- ⚠️ **현재 코드는 아직 목표 설계와 다름**: `routes/auth.js`의 Guest는 PostgreSQL `users`에 저장되고 24시간 JWT를 씀. Redis 기반 30분 Guest는 #5·#12에서 구현
+- ⚠️ **Guest는 HTTP까지만 목표 설계와 같음**: Redis 30분 세션은 #5에서 구현. 소켓 Guest·Guest 채팅(#10), 만료 카운트다운·`guest:expired`(#12)는 아직 없음
 - `src/backend/.env`는 git 제외됨. 새 환경에서는 `.env.example` 복사
 - GitHub 이슈 #17(My Orbit) 아직 미등록
