@@ -1,64 +1,57 @@
 const db = require('../db');
 
-// 코사인 유사도 계산
-function cosineSimilarity(vecA, vecB) {
-  let dotProduct = 0;
+// 가중치 코사인 유사도 (docs/system_design.md §6)
+// 벡터: { tagId: weight(1~3) }
+function cosineSimilarity(a, b) {
+  let dot = 0;
   let normA = 0;
   let normB = 0;
-  for (let i = 0; i < vecA.length; i++) {
-    dotProduct += vecA[i] * vecB[i];
-    normA += vecA[i] * vecA[i];
-    normB += vecB[i] * vecB[i];
+  for (const [tagId, w] of a) {
+    normA += w * w;
+    const wb = b.get(tagId);
+    if (wb) dot += w * wb;
   }
+  for (const w of b.values()) normB += w * w;
   if (normA === 0 || normB === 0) return 0;
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-}
-
-// 유저의 취향을 벡터로 변환
-async function getUserTasteVector(userId) {
-  const allOptions = await db.query('SELECT id FROM taste_options ORDER BY id');
-  const userTastes = await db.query(
-    'SELECT taste_option_id FROM user_tastes WHERE user_id = $1',
-    [userId]
-  );
-
-  const userTasteSet = new Set(userTastes.rows.map(r => r.taste_option_id));
-  return allOptions.rows.map(opt => userTasteSet.has(opt.id) ? 1 : 0);
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
 // 매칭 후보 찾기
+// TODO(#13): 온라인 actor(Redis)만 후보로, Guest 포함, 카테고리 가중치, 최근 거절(24h) 제외
 async function findMatches(userId, limit = 10) {
-  const myVector = await getUserTasteVector(userId);
-
-  // 이미 매칭/차단된 유저 제외
-  const excluded = await db.query(
-    `SELECT user2_id AS uid FROM matches WHERE user1_id = $1
-     UNION SELECT user1_id FROM matches WHERE user2_id = $1
-     UNION SELECT blocked_id FROM blocks WHERE blocker_id = $1
-     UNION SELECT blocker_id FROM blocks WHERE blocked_id = $1`,
-    [userId]
-  );
-  const excludeSet = new Set(excluded.rows.map(r => r.uid));
-  excludeSet.add(userId);
-
-  // 취향이 있는 활성 유저들
-  const candidates = await db.query(
-    `SELECT DISTINCT ut.user_id FROM user_tastes ut
-     JOIN users u ON ut.user_id = u.id
-     WHERE u.status = 'active' AND ut.user_id != $1`,
+  // 한 번의 쿼리로 나와 후보들의 취향을 모두 가져옴
+  const { rows } = await db.query(
+    `SELECT ut.user_id, ut.tag_id, ut.weight
+     FROM user_tastes ut
+     JOIN users u ON u.id = ut.user_id AND u.status = 'active'
+     WHERE ut.user_id = $1
+        OR ut.user_id NOT IN (
+          SELECT blocked_id FROM blocks WHERE blocker_id = $1
+          UNION SELECT blocker_id FROM blocks WHERE blocked_id = $1
+          UNION SELECT target_id FROM match_history WHERE requester_id = $1 AND status IN ('pending', 'accepted')
+          UNION SELECT requester_id FROM match_history WHERE target_id = $1 AND status IN ('pending', 'accepted')
+        )`,
     [userId]
   );
 
-  const scored = [];
-  for (const candidate of candidates.rows) {
-    if (excludeSet.has(candidate.user_id)) continue;
-    const candidateVector = await getUserTasteVector(candidate.user_id);
-    const score = cosineSimilarity(myVector, candidateVector);
-    if (score > 0) {
-      scored.push({ userId: candidate.user_id, score });
-    }
+  const vectors = new Map();
+  for (const r of rows) {
+    if (!vectors.has(r.user_id)) vectors.set(r.user_id, new Map());
+    vectors.get(r.user_id).set(r.tag_id, r.weight);
   }
 
+  const mine = vectors.get(userId);
+  if (!mine) return [];
+  vectors.delete(userId);
+
+  const scored = [];
+  for (const [candidateId, vec] of vectors) {
+    const score = cosineSimilarity(mine, vec);
+    if (score > 0) {
+      const commonTagIds = [...mine.keys()].filter((t) => vec.has(t));
+      scored.push({ userId: candidateId, score, commonTagIds });
+    }
+  }
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, limit);
 }
