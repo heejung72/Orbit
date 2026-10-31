@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Orbit CodeRabbit 설정 — 규칙 원본: CONTRIBUTING.md, docs/system_design.md
+
+language: "ko-KR"
+tone_instructions: "친절하지만 명확하게 한국어로 리뷰해 주세요. 근거와 함께 구체적인 수정 코드를 제안하고, 사소한 스타일보다 버그·보안·기획 불일치를 우선해 주세요."
+early_access: false
+
+reviews:
+  profile: "chill"                 # chill | assertive
+  request_changes_workflow: false
+  high_level_summary: true
+  review_status: true
+  collapse_walkthrough: false
+  sequence_diagrams: true
+  poem: false
+  changed_files_summary: true
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "main"
+
+  # 리뷰에서 제외할 파일
+  path_filters:
+    - "!**/node_modules/**"
+    - "!**/.expo/**"
+    - "!**/package-lock.json"
+    - "!**/*.png"
+    - "!**/*.jpg"
+    - "!.idea/**"
+
+  path_instructions:
+    - path: "**"
+      instructions: |
+        Orbit은 취향 기반 익명 소셜 채팅·커뮤니티 앱입니다. 기획 원본은 docs/prd.md, 설계는 docs/system_design.md입니다.
+        - PR 제목·커밋은 `[TYPE] #번호 요약` 형식(예: `[FEAT] #5 Guest 세션`), 브랜치는 `type/#번호-설명` 형식인지 확인하세요.
+        - PR이 연결된 이슈 범위(docs/tasks.md의 해당 이슈 체크리스트)를 벗어나는 변경을 포함하면 알려주세요.
+        - 기획이 바뀌는 변경인데 docs/prd.md 또는 docs/progress.md 결정 로그가 갱신되지 않았다면 지적하세요.
+
+    - path: "src/backend/**"
+      instructions: |
+        Express.js + Socket.io + PostgreSQL + Redis 백엔드입니다.
+        - [중요] Guest 데이터는 PostgreSQL에 저장하지 않고 Redis에만 TTL로 저장합니다. 예외는 신고 시 reports의 메시지 스냅샷뿐입니다.
+        - [중요] Guest 메시지 본문(content)이 console.log, 에러 로그, 분석 이벤트에 남지 않는지 확인하세요.
+        - Guest 세션은 최초 입장 후 30분 절대 시간제입니다. 만료 연장(TTL 갱신, expiresAt 수정) 코드가 있으면 지적하세요.
+        - 만료 판정을 Redis TTL에만 의존하지 말고, HTTP 요청과 소켓 이벤트마다 서버가 expiresAt을 직접 검증해야 합니다.
+        - 인증은 memberAuth / guestAuth / optionalAuth 미들웨어와 req.actor({type, id})로 통일합니다.
+        - 실제 user_id, 이메일 등 식별 정보가 클라이언트 응답이나 소켓 payload에 노출되지 않는지 확인하세요. 채팅에서는 display_name, avatar_id만 노출합니다.
+        - SQL은 반드시 파라미터 바인딩을 사용해야 합니다. 문자열 연결로 만든 쿼리는 지적하세요.
+        - 비밀번호는 bcrypt 해싱, JWT_SECRET 등 비밀값은 .env에서만 읽어야 합니다.
+        - 여러 테이블을 바꾸는 작업(특히 Guest → 회원 전환)은 트랜잭션으로 처리하는지 확인하세요.
+        - 메시지 전송 경로에 profanityFilter와 rateLimit이 적용되어 있는지 확인하세요.
+        - 차단 관계는 양방향으로 확인해야 합니다(매칭 후보, 1:1 방, 라운지 메시지).
+
+    - path: "src/backend/migrations/**"
+      instructions: |
+        - docs/database.md와 테이블·컬럼이 일치하는지 확인하세요.
+        - PK는 UUID(카테고리·태그 등 seed 테이블은 SERIAL 허용), created_at은 TIMESTAMPTZ DEFAULT now() 규칙을 따르는지 확인하세요.
+        - 자주 조회하는 FK와 조건 컬럼(room_id, created_at 등)에 인덱스가 있는지 확인하세요.
+
+    - path: "src/frontend/**"
+      instructions: |
+        React Native(Expo) 앱이며 iOS·Android·Web을 함께 지원합니다.
+        - 토큰(JWT, guestToken)은 앱에서 Expo SecureStore에 저장해야 합니다. AsyncStorage에 토큰을 저장하면 지적하세요.
+        - Guest 타이머는 expiresAt 기준으로 계산해야 합니다. 앱이 백그라운드에서 돌아와도 남은 시간이 정확한지 확인하세요.
+        - 색상·폰트·간격 값을 하드코딩하지 말고 theme/ 토큰을 사용하는지 확인하세요.
+        - 소켓 리스너와 setInterval이 컴포넌트 언마운트 시 정리(cleanup)되는지 확인하세요.
+        - react-native-web에서 동작하지 않는 API를 사용하면 알려주세요.
+        - 화면 문구는 부드러운 존댓말 톤을 유지하는지 봐주세요.
+
+    - path: "docs/**"
+      instructions: |
+        - 문서끼리 내용이 어긋나지 않는지(prd ↔ system_design ↔ api_spec ↔ database ↔ tasks) 확인하세요.
+        - Mermaid 다이어그램이 GitHub에서 렌더링되는 문법인지 확인하세요. sequenceDiagram에서는 `<-->`를 쓸 수 없습니다.
+
+chat:
+  auto_reply: true
