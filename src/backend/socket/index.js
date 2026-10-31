@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
-const { filterMessage, containsBadWords } = require('../middleware/filter');
+const { filterMessage, containsBadWords } = require('../middleware/profanityFilter');
 
 function setupSocket(io) {
   // 인증 미들웨어 (게스트 토큰도 허용)
