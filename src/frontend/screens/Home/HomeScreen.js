@@ -92,10 +92,10 @@ export default function HomeScreen({ isGuest }) {
   // 매칭 상세 모달 (벤다이어그램)
   const renderMatchModal = () => {
     if (!selectedMatch) return null;
-    const otherTastes = (selectedMatch.tastes || []).map(t => t.taste || t);
-    const shared = myTasteNames.filter(t => otherTastes.includes(t));
-    const myOnly = myTasteNames.filter(t => !otherTastes.includes(t));
-    const otherOnly = otherTastes.filter(t => !myTasteNames.includes(t));
+    // 상대의 전체 취향은 익명성을 위해 받지 않고, 서버가 계산한 공통 취향만 사용 (#13에서 화면 재구성)
+    const shared = selectedMatch.common_tags || [];
+    const myOnly = myTasteNames.filter(t => !shared.includes(t));
+    const otherOnly = [];
 
     // 레이더 차트 데이터: 카테고리별 취향 수 비교
     const categories = [...new Set([
@@ -144,7 +144,11 @@ export default function HomeScreen({ isGuest }) {
   // 취향 이미지 카드
   const renderTasteCard = ({ item: option }) => (
     <TouchableOpacity style={styles.tasteCard} activeOpacity={0.8}>
-      <Image source={{ uri: option.image_url }} style={styles.tasteImage} />
+      {option.image_url ? (
+        <Image source={{ uri: option.image_url }} style={styles.tasteImage} />
+      ) : (
+        <View style={[styles.tasteImage, styles.tastePlaceholder]} />
+      )}
       <View style={styles.tasteOverlay}>
         <Text style={styles.tasteName}>{option.name}</Text>
       </View>
@@ -198,7 +202,7 @@ export default function HomeScreen({ isGuest }) {
           <View key={cat.id} style={styles.section}>
             <Text style={styles.sectionTitle}>{cat.icon} {cat.name}</Text>
             <FlatList
-              data={cat.options.filter(o => o.image_url)}
+              data={cat.options}
               renderItem={renderTasteCard}
               keyExtractor={item => String(item.id)}
               horizontal
@@ -293,6 +297,7 @@ const styles = StyleSheet.create({
     width: 130, height: 160, borderRadius: 14, marginHorizontal: 6, overflow: 'hidden',
   },
   tasteImage: { width: '100%', height: '100%' },
+  tastePlaceholder: { backgroundColor: '#6C5CE7' }, // 이미지 없는 태그 (#8에서 디자인 토큰으로 교체)
   tasteOverlay: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: 'rgba(0,0,0,0.45)', paddingVertical: 8, paddingHorizontal: 10,

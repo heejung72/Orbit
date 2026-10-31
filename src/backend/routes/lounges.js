@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { listLounges, getLounge } = require('../services/lounges');
+const { toUuid } = require('../utils/validate');
 
 const router = express.Router();
 
@@ -35,8 +36,9 @@ router.post('/:id/join', async (req, res) => {
   if (req.isGuest) {
     return res.status(403).json({ error: '회원만 라운지에 참여할 수 있어요' });
   }
+  const loungeId = toUuid(req.params.id);
+  if (!loungeId) return res.status(404).json({ error: '라운지를 찾을 수 없습니다' });
   try {
-    const loungeId = req.params.id;
     const lounge = await db.query(
       `SELECT l.max_members, (SELECT COUNT(*)::int FROM lounge_members WHERE lounge_id = l.id) AS member_count
        FROM lounges l WHERE l.id = $1`,
@@ -59,9 +61,11 @@ router.post('/:id/join', async (req, res) => {
 
 // 라운지 나가기
 router.delete('/:id/leave', async (req, res) => {
+  const loungeId = toUuid(req.params.id);
+  if (!loungeId) return res.status(404).json({ error: '라운지를 찾을 수 없습니다' });
   try {
     await db.query('DELETE FROM lounge_members WHERE lounge_id = $1 AND user_id = $2', [
-      req.params.id,
+      loungeId,
       req.userId,
     ]);
     res.json({ message: '라운지에서 나갔어요' });

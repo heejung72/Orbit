@@ -1,6 +1,8 @@
 const express = require('express');
 const db = require('../db');
 const { findMatches } = require('../services/matching');
+const { isBlockedBetween } = require('../services/blocks');
+const { toUuid } = require('../utils/validate');
 
 const router = express.Router();
 
@@ -38,9 +40,14 @@ router.post('/find', async (req, res) => {
 
 // 매칭 요청
 router.post('/request/:targetId', async (req, res) => {
+  const targetId = toUuid(req.params.targetId);
+  if (!targetId) return res.status(404).json({ error: '상대를 찾을 수 없습니다' });
+  if (targetId === req.userId) return res.status(400).json({ error: '자기 자신에게는 요청할 수 없어요' });
   try {
-    const { targetId } = req.params;
-    if (targetId === req.userId) return res.status(400).json({ error: '자기 자신에게는 요청할 수 없어요' });
+    // 차단 관계(양방향)면 요청 불가 — 차단 사실이 드러나지 않도록 404와 같은 응답
+    if (await isBlockedBetween(req.userId, targetId)) {
+      return res.status(404).json({ error: '상대를 찾을 수 없습니다' });
+    }
 
     const score = Math.max(0, Math.min(1, (Number(req.body.similarity_score) || 0) / 100));
     const { rows } = await db.query(
@@ -60,6 +67,8 @@ router.post('/request/:targetId', async (req, res) => {
 
 // 매칭 수락 → 1:1 채팅방 생성 (방 단위 익명 표시 정보 저장)
 router.post('/:matchId/accept', async (req, res) => {
+  const matchId = toUuid(req.params.matchId);
+  if (!matchId) return res.status(404).json({ error: '대화 요청을 찾을 수 없습니다' });
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
@@ -67,10 +76,16 @@ router.post('/:matchId/accept', async (req, res) => {
       `UPDATE match_history SET status = 'accepted', responded_at = now()
        WHERE id = $1 AND target_id = $2 AND status = 'pending'
        RETURNING requester_id, target_id`,
-      [req.params.matchId, req.userId]
+      [matchId, req.userId]
     );
     if (match.rows.length === 0) {
       await client.query('ROLLBACK');
+      return res.status(404).json({ error: '대화 요청을 찾을 수 없습니다' });
+    }
+    // 요청 이후 차단이 생겼다면 방을 만들지 않고 요청을 취소 처리
+    if (await isBlockedBetween(match.rows[0].requester_id, match.rows[0].target_id, client)) {
+      await client.query(`UPDATE match_history SET status = 'cancelled' WHERE id = $1`, [matchId]);
+      await client.query('COMMIT');
       return res.status(404).json({ error: '대화 요청을 찾을 수 없습니다' });
     }
 
@@ -81,10 +96,10 @@ router.post('/:matchId/accept', async (req, res) => {
        SELECT $1, u.id, u.nickname, u.avatar_id FROM users u WHERE u.id = ANY($2)`,
       [roomId, [match.rows[0].requester_id, match.rows[0].target_id]]
     );
-    await client.query('UPDATE match_history SET room_id = $1 WHERE id = $2', [roomId, req.params.matchId]);
+    await client.query('UPDATE match_history SET room_id = $1 WHERE id = $2', [roomId, matchId]);
     await client.query('COMMIT');
 
-    res.json({ matchId: req.params.matchId, chatRoomId: roomId, status: 'accepted' });
+    res.json({ matchId, chatRoomId: roomId, status: 'accepted' });
   } catch (err) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: '서버 오류가 발생했습니다' });
@@ -95,11 +110,13 @@ router.post('/:matchId/accept', async (req, res) => {
 
 // 매칭 거절
 router.post('/:matchId/reject', async (req, res) => {
+  const matchId = toUuid(req.params.matchId);
+  if (!matchId) return res.status(404).json({ error: '대화 요청을 찾을 수 없습니다' });
   try {
     await db.query(
       `UPDATE match_history SET status = 'rejected', responded_at = now()
        WHERE id = $1 AND target_id = $2 AND status = 'pending'`,
-      [req.params.matchId, req.userId]
+      [matchId, req.userId]
     );
     res.json({ status: 'rejected' });
   } catch (err) {

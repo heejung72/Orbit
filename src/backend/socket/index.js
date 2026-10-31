@@ -5,7 +5,8 @@ const { getRoomForMember } = require('../services/chatAccess');
 
 // Socket.io
 // TODO(#10): 이벤트 이름을 설계(room:join, message:send, message:new …)로 변경, Guest(Redis) 지원,
-//            모든 이벤트에서 Guest expiresAt 검사, sender_id 대신 is_mine
+//            모든 이벤트에서 Guest expiresAt 검사
+// TODO(#16): send_message 사용자 단위 Rate Limit (Redis)
 function setupSocket(io) {
   // 인증: 회원 JWT만 허용 (Guest는 #5에서 guestToken으로 추가)
   io.use((socket, next) => {
@@ -27,7 +28,7 @@ function setupSocket(io) {
       try {
         const room = await getRoomForMember(roomId, socket.userId);
         if (!room) return socket.emit('error', { message: '채팅방에 들어갈 수 없습니다' });
-        socket.join(roomId);
+        socket.join(room.id);
       } catch {
         socket.emit('error', { message: '채팅방에 들어갈 수 없습니다' });
       }
@@ -53,24 +54,26 @@ function setupSocket(io) {
         const { rows } = await db.query(
           `INSERT INTO messages (room_id, sender_id, content) VALUES ($1, $2, $3)
            RETURNING id, created_at`,
-          [roomId, socket.userId, filtered]
+          [room.id, socket.userId, filtered]
         );
         const sender = await db.query(
           `SELECT COALESCE(cm.display_name, u.nickname) AS nickname
            FROM users u LEFT JOIN chat_members cm ON cm.room_id = $1 AND cm.user_id = u.id
            WHERE u.id = $2`,
-          [roomId, socket.userId]
+          [room.id, socket.userId]
         );
 
-        io.to(roomId).emit('new_message', {
+        // 실제 user_id 대신 is_mine: 보낸 사람에게는 true, 나머지에게는 false
+        const message = {
           id: rows[0].id,
-          room_id: roomId,
-          sender_id: socket.userId,
+          room_id: room.id,
           sender_nickname: sender.rows[0]?.nickname,
           is_guest: false,
           content: filtered,
           created_at: rows[0].created_at,
-        });
+        };
+        socket.emit('new_message', { ...message, is_mine: true });
+        socket.to(room.id).emit('new_message', { ...message, is_mine: false });
       } catch {
         socket.emit('error', { message: '메시지 전송에 실패했습니다' });
       }

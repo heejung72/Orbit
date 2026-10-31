@@ -1,10 +1,9 @@
 const express = require('express');
 const db = require('../db');
 const { getRoomForMember } = require('../services/chatAccess');
+const { toUuid, toPositiveInt, toIsoDate } = require('../utils/validate');
 
 const router = express.Router();
-
-const UUID_RE = /^[0-9a-f-]{36}$/i;
 
 // 내 채팅방 목록
 router.get('/rooms', async (req, res) => {
@@ -49,25 +48,32 @@ router.get('/rooms', async (req, res) => {
 // 메시지 조회 (커서: before = ISO 시각)
 router.get('/rooms/:roomId/messages', async (req, res) => {
   try {
-    const { roomId } = req.params;
-    if (!UUID_RE.test(roomId)) return res.status(404).json({ error: '채팅방을 찾을 수 없습니다' });
+    const roomId = toUuid(req.params.roomId);
+    if (!roomId) return res.status(404).json({ error: '채팅방을 찾을 수 없습니다' });
 
     const room = await getRoomForMember(roomId, req.userId);
     if (!room) return res.status(404).json({ error: '채팅방을 찾을 수 없습니다' });
 
-    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
-    const params = [roomId];
+    const limit = toPositiveInt(req.query.limit, 50, 100);
+    let before = null;
+    if (req.query.before !== undefined) {
+      before = toIsoDate(req.query.before);
+      if (!before) return res.status(400).json({ error: 'before 값이 올바르지 않습니다' });
+    }
+
+    const params = [roomId, req.userId];
     let where = 'm.room_id = $1';
-    if (req.query.before) {
-      params.push(req.query.before);
+    if (before) {
+      params.push(before);
       where += ` AND m.created_at < $${params.length}`;
     }
     params.push(limit);
 
+    // 실제 user_id는 내려주지 않고 is_mine으로만 구분 (docs/prd.md §3-6)
     // 표시 이름: 1:1은 방 단위 display_name, 라운지는 회원 닉네임
-    // TODO(#10): sender_id 대신 is_mine 플래그로 바꿔 실제 user_id 노출 제거
     const result = await db.query(
-      `SELECT m.id, m.content, m.created_at, m.sender_id,
+      `SELECT m.id, m.content, m.created_at,
+              (m.sender_id = $2) AS is_mine,
               COALESCE(cm.display_name, u.nickname, '떠난 궤도') AS sender_nickname,
               false AS is_guest
        FROM messages m

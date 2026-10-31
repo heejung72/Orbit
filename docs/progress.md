@@ -38,6 +38,9 @@
 | 2026-10-31 | #3은 스키마 + **기존 라우트 SQL 수정까지** (앱 동작 유지) | PG Guest 로그인은 #5 전까지 501 |
 | 2026-10-31 | 프로필 사진·자기소개(bio) 제거, 캐릭터(`avatar_id`)로 대체 | PRD 익명 원칙 |
 | 2026-10-31 | 마이그레이션은 새 파일 추가 방식, `schema_migrations`로 기록 | 적용된 파일은 수정 금지 |
+| 2026-10-31 | 메시지 응답은 `sender_id` 대신 **`is_mine`** | PR #20 CodeRabbit, 익명성 |
+| 2026-10-31 | 라우트 입구에서 UUID·숫자·날짜 검증(`utils/validate.js`), 잘못된 값은 400/404 | PR #20 CodeRabbit |
+| 2026-10-31 | 매칭 요청·수락 시 차단 관계 양방향 재확인, 차단 후 수락은 `cancelled` | PR #20 CodeRabbit |
 | 2026-10-31 | CodeRabbit 리뷰 반영 커밋은 항상 **`[FIX]`** | 이슈 타입과 무관 |
 | 2026-10-31 | 이슈·커밋·PR 제목은 **`[TYPE]` 대문자 대괄호** 형식 | 예: `[FEAT] #5 Guest 세션 발급 API 추가`. 브랜치만 소문자 |
 
@@ -54,7 +57,8 @@
 - frontend 임시 아이콘(`assets/*.png`)은 #2에서 만든 placeholder — 정식 디자인은 #8
 - ⚠️ **#3 이후 로컬 DB는 초기화 필요**: `cd src/backend && npm run db:setup` (기존 TasteMate 테이블과 호환 안 됨)
 - 임시 API 형태(#3에서 유지): `POST /matching/find`, `PUT /users/me/tastes` 등은 각 기능 이슈(#7, #13)에서 api_spec 형태로 교체
-- 메시지·매칭 응답에 아직 `sender_id`/후보 `id`(실제 user_id)가 포함됨 → #10, #13에서 익명 참조로 교체
+- 메시지(REST·소켓)는 `is_mine`만 내려줌(실제 user_id 제거, PR #20). 매칭 후보 `id`는 아직 실제 user_id → #13에서 익명 참조로 교체
+- 소켓 `send_message` Rate Limit 없음 → #16에서 Redis 기반으로 추가
 - ⚠️ **현재 코드는 아직 목표 설계와 다름**: `routes/auth.js`의 Guest는 PostgreSQL `users`에 저장되고 24시간 JWT를 씀. Redis 기반 30분 Guest는 #5·#12에서 구현
 - `src/backend/.env`는 git 제외됨. 새 환경에서는 `.env.example` 복사
 - GitHub 이슈 #17(My Orbit) 아직 미등록

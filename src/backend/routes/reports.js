@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('../db');
+const { toUuid } = require('../utils/validate');
 
 const router = express.Router();
 
@@ -8,7 +9,8 @@ const REASONS = ['harassment', 'spam', 'inappropriate', 'personal_info', 'other'
 // 신고
 // TODO(#16): Guest 신고(reporter_guest_id/reported_guest_id), room_id·message_snapshot 저장, 자동 제재 기준 재검토
 router.post('/', async (req, res) => {
-  const { reported_id, reason, description } = req.body;
+  const { reason, description } = req.body || {};
+  const reported_id = toUuid(req.body && req.body.reported_id);
   if (!reported_id || !REASONS.includes(reason)) {
     return res.status(400).json({ error: '신고 대상과 사유를 확인해주세요' });
   }
@@ -21,7 +23,7 @@ router.post('/', async (req, res) => {
     await client.query('BEGIN');
     await client.query(
       `INSERT INTO reports (reporter_user_id, reported_user_id, reason, description) VALUES ($1, $2, $3, $4)`,
-      [req.userId, reported_id, reason, description || '']
+      [req.userId, reported_id, reason, typeof description === 'string' ? description.slice(0, 1000) : '']
     );
     const result = await client.query(
       `UPDATE users SET report_count = report_count + 1,
@@ -41,6 +43,7 @@ router.post('/', async (req, res) => {
     res.status(201).json({ message: '신고가 접수되었습니다' });
   } catch (err) {
     await client.query('ROLLBACK');
+    if (err.code === '23503') return res.status(404).json({ error: '신고 대상을 찾을 수 없습니다' });
     res.status(500).json({ error: '서버 오류가 발생했습니다' });
   } finally {
     client.release();
@@ -50,7 +53,7 @@ router.post('/', async (req, res) => {
 // 차단
 router.post('/block', async (req, res) => {
   try {
-    const { blocked_id } = req.body;
+    const blocked_id = toUuid(req.body && req.body.blocked_id);
     if (!blocked_id || blocked_id === req.userId) {
       return res.status(400).json({ error: '차단 대상을 확인해주세요' });
     }
@@ -67,10 +70,12 @@ router.post('/block', async (req, res) => {
 
 // 차단 해제
 router.delete('/block/:userId', async (req, res) => {
+  const blockedId = toUuid(req.params.userId);
+  if (!blockedId) return res.status(400).json({ error: '차단 해제 대상을 확인해주세요' });
   try {
     await db.query('DELETE FROM blocks WHERE blocker_id = $1 AND blocked_id = $2', [
       req.userId,
-      req.params.userId,
+      blockedId,
     ]);
     res.json({ message: '차단이 해제되었습니다' });
   } catch (err) {

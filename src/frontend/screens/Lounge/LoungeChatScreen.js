@@ -38,10 +38,11 @@ export default function LoungeChatScreen({ route, navigation }) {
           <Text style={styles.joinText}>{lounge.is_member ? '참여 중' : '참여하기'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.chatButton}
+          style={[styles.chatButton, !lounge.chat_room_id && styles.chatButtonDisabled]}
+          disabled={!lounge.chat_room_id}
           onPress={() => navigation.navigate('ChatRoom', { roomId: lounge.chat_room_id, title: lounge.name })}
         >
-          <Text style={styles.chatText}>그룹 채팅</Text>
+          <Text style={styles.chatText}>{lounge.chat_room_id ? '그룹 채팅' : '채팅 준비 중'}</Text>
         </TouchableOpacity>
       </View>
 
@@ -74,6 +75,7 @@ const styles = StyleSheet.create({
   joinButton: { flex: 1, backgroundColor: '#6C5CE7', borderRadius: 12, padding: 14, alignItems: 'center' },
   joinText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
   chatButton: { flex: 1, backgroundColor: '#E8E5FF', borderRadius: 12, padding: 14, alignItems: 'center' },
+  chatButtonDisabled: { opacity: 0.5 },
   chatText: { color: '#6C5CE7', fontWeight: 'bold', fontSize: 15 },
   sectionTitle: { fontSize: 17, fontWeight: 'bold', marginLeft: 16, marginTop: 8, marginBottom: 8, color: '#333' },
   member: { flexDirection: 'row', alignItems: 'center', padding: 12, paddingHorizontal: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F5F5F5' },

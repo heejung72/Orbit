@@ -53,16 +53,26 @@ router.put('/me', async (req, res) => {
 // body: { tags: [{ tagId, weight(1~3) }] }
 // TODO(#7): PUT /api/tastes/me 로 이동, Guest(Redis) 지원
 router.put('/me/tastes', async (req, res) => {
-  const { tags } = req.body;
+  const { tags } = req.body || {};
 
   if (!Array.isArray(tags) || tags.length < 3) {
     return res.status(400).json({ error: '최소 3개의 취향을 선택해주세요' });
   }
   const valid = tags.every(
-    (t) => Number.isInteger(t.tagId) && Number.isInteger(t.weight) && t.weight >= 1 && t.weight <= 3
+    (t) =>
+      t !== null &&
+      typeof t === 'object' &&
+      Number.isInteger(t.tagId) &&
+      t.tagId > 0 &&
+      Number.isInteger(t.weight) &&
+      t.weight >= 1 &&
+      t.weight <= 3
   );
   if (!valid) {
     return res.status(400).json({ error: '취향 형식이 올바르지 않습니다' });
+  }
+  if (new Set(tags.map((t) => t.tagId)).size !== tags.length) {
+    return res.status(400).json({ error: '같은 취향이 중복으로 선택되었습니다' });
   }
 
   const client = await db.pool.connect();
@@ -72,14 +82,14 @@ router.put('/me/tastes', async (req, res) => {
     await client.query(
       `INSERT INTO user_tastes (user_id, tag_id, weight)
        SELECT $1, t.tag_id, t.weight
-       FROM UNNEST($2::int[], $3::smallint[]) AS t(tag_id, weight)
-       ON CONFLICT (user_id, tag_id) DO UPDATE SET weight = EXCLUDED.weight`,
+       FROM UNNEST($2::int[], $3::smallint[]) AS t(tag_id, weight)`,
       [req.userId, tags.map((t) => t.tagId), tags.map((t) => t.weight)]
     );
     await client.query('COMMIT');
     res.json({ message: '취향이 업데이트되었습니다' });
   } catch (err) {
     await client.query('ROLLBACK');
+    if (err.code === '23503') return res.status(400).json({ error: '존재하지 않는 취향이 포함되어 있습니다' });
     res.status(500).json({ error: '서버 오류가 발생했습니다' });
   } finally {
     client.release();

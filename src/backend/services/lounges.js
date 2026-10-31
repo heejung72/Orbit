@@ -1,4 +1,5 @@
 const db = require('../db');
+const { toUuid } = require('../utils/validate');
 
 // 라운지 공통 조회 (public / lounges 라우트에서 함께 사용)
 // 실제 사용자 ID는 반환하지 않습니다 — docs/prd.md §3-6
@@ -13,8 +14,9 @@ const LIST_SELECT = `
 async function listLounges({ categoryId, search, limit } = {}) {
   const params = [];
   let where = 'WHERE 1=1';
-  if (categoryId) {
-    params.push(categoryId);
+  const category = Number.parseInt(categoryId, 10);
+  if (Number.isInteger(category) && category > 0) {
+    params.push(category);
     where += ` AND l.category_id = $${params.length}`;
   }
   if (search) {
@@ -29,7 +31,9 @@ async function listLounges({ categoryId, search, limit } = {}) {
   return (await db.query(sql, params)).rows;
 }
 
-async function getLounge(loungeId, viewerUserId = null) {
+async function getLounge(rawLoungeId, viewerUserId = null) {
+  const loungeId = toUuid(rawLoungeId);
+  if (!loungeId) return null;
   const lounge = await db.query(
     `SELECT l.id, l.name, l.description, l.icon, l.category_id, l.max_members, l.created_at,
             tc.name AS category_name, tc.icon AS category_icon,

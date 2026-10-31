@@ -93,9 +93,17 @@
 - [x] socket: 방 접근 확인 후 join/send, 메시지 1~1000자, 새 `messages` 컬럼
 - [x] frontend: 취향 저장 형식, 라운지 채팅 진입 시 `chat_room_id` 사용(기존 버그), 라운지 멤버 표시, 자기소개(bio) 제거
 
+### CodeRabbit 리뷰 반영 (PR #20)
+- [x] 메시지 REST·소켓에서 `sender_id` 제거 → `is_mine`
+- [x] 입력 검증 `utils/validate.js`: chat(roomId·before·limit), lounges(id·category_id), matching, reports·blocks (UUID 소문자 정규화로 자기 신고·차단 우회 차단)
+- [x] 취향 저장: null·중복·없는 태그 → 400
+- [x] 매칭 요청·수락 시 차단 확인 (`services/blocks.js`)
+- [x] 홈: 이미지 없는 태그 카드 표시, 매칭 모달은 `common_tags` 사용 / 라운지: 채팅방 없으면 버튼 비활성화
+- [ ] 소켓 Rate Limit → #16으로 이관
+
 ### 확인
 - [x] 빈 DB에서 `npm run db:setup` 성공, migrate·seed 재실행 안전
-- [x] API 시나리오 37개 + 소켓 시나리오 5개 통과 (가입→취향→라운지 참여→매칭 요청·수락→1:1·라운지 메시지→신고·차단)
+- [x] API 시나리오 37개 + 소켓 시나리오 5개 + 리뷰 반영 검사 28개 통과 (가입→취향→라운지 참여→매칭 요청·수락→1:1·라운지 메시지→신고·차단)
 - [x] frontend `npx expo export --platform web` 성공
 
 **완료 기준:** 빈 DB에서 migrate + seed가 한 번에 성공하고, 기존 화면이 새 스키마로 동작한다.
@@ -192,7 +200,7 @@
 - [ ] `POST /reports` (메시지 스냅샷 저장), `POST/DELETE /blocks`
 - [ ] 차단 시: 1:1 방 종료, 매칭 후보 제외, 라운지 메시지 숨김
 - [ ] `profanityFilter` (단어 목록 + 마스킹 `***`)
-- [ ] `rateLimit` (Redis, 메시지 초당 2회 / 동일 메시지 3회 연속 차단)
+- [ ] `rateLimit` (Redis, 메시지 초당 2회 / 동일 메시지 3회 연속 차단) — **HTTP + 소켓 `send_message` 둘 다** (PR #20 CodeRabbit 지적), 방 조회·DB 작업 전에 적용
 - [ ] 메시지 길게 누르기 → 신고/차단 시트, Report 화면
 
 ## #17 [FEAT] My Orbit
