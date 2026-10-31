@@ -73,7 +73,7 @@ export default function HomeScreen({ isGuest }) {
         </View>
         <View style={styles.matchCardInfo}>
           <Text style={styles.matchNickname}>{item.nickname}</Text>
-          <Text style={styles.matchBio} numberOfLines={2}>{item.bio || '자기소개가 없습니다'}</Text>
+          <Text style={styles.matchBio} numberOfLines={2}>{item.common_tags?.length ? `공통 취향: ${item.common_tags.join(' · ')}` : ''}</Text>
         </View>
       </View>
       <View style={styles.matchScoreRow}>
