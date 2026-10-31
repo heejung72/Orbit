@@ -14,11 +14,15 @@ export default function App() {
   useEffect(() => {
     setOnSessionExpired(() => setAuthState('loggedOut'));
     (async () => {
-      if (await secureStorage.get('token')) return setAuthState('member');
-      const guestToken = await secureStorage.get('guestToken');
-      const expiresAt = Date.parse(await AsyncStorage.getItem('guestExpiresAt'));
-      if (guestToken && expiresAt > Date.now()) return setAuthState('guest');
-      await clearSession(); // 만료됐거나 반쯤 남은 세션 정리
+      try {
+        if (await secureStorage.get('token')) return setAuthState('member');
+        const guestToken = await secureStorage.get('guestToken');
+        const expiresAt = Date.parse(await AsyncStorage.getItem('guestExpiresAt'));
+        if (guestToken && expiresAt > Date.now()) return setAuthState('guest');
+        await clearSession(); // 만료됐거나 반쯤 남은 세션 정리
+      } catch (err) {
+        console.warn('세션 확인 실패:', err.message); // 저장소 오류여도 로그인 화면은 보여준다
+      }
       setAuthState('loggedOut');
     })();
   }, []);

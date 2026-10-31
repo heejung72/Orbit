@@ -23,7 +23,7 @@
 |---|---|---|---|
 | POST | `/auth/register` | - (선택: `X-Guest-Token`) | 회원가입. Guest 토큰이 있으면 데이터 이전 (#14) |
 | POST | `/auth/login` | - | 로그인 → JWT |
-| GET | `/auth/me` | O | `{type: 'member'|'guest', nickname, avatar_id, avatar_emoji, expires_at?}` |
+| GET | `/auth/me` | O | `{type: 'member' \| 'guest', nickname, avatar_id, avatar_emoji, expires_at?}` |
 
 ## Guest — #5
 | Method | Path | 인증 | 설명 |

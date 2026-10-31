@@ -64,7 +64,7 @@ push·PR 전에 **ponytail-review** 기준으로 이번 변경(`git diff main...
 - 인증은 `memberAuth` / `guestAuth` / `optionalAuth` + `req.actor = {type, id}`로 통일.
 - 클라이언트에는 실제 user_id·이메일을 노출하지 않는다. 채팅에서는 `display_name`, `avatar_id`만.
 - SQL은 파라미터 바인딩만. 비밀값은 `.env`에서만. `.env`는 커밋 금지.
-- 토큰은 iOS·Android에서 Expo SecureStore에 저장. Web 저장 방식은 #5에서 결정(`Platform.OS` 분기). 색상·폰트는 `theme/` 토큰 사용.
+- 토큰은 `services/storage.js`로만 저장: iOS·Android는 Expo SecureStore, Web은 localStorage(`Platform.OS` 분기). 웹 회원 로그인을 정식 지원할 때 HttpOnly 쿠키 전환 검토. 색상·폰트는 `theme/` 토큰 사용.
 
 ## 실행
 - backend: `cd src/backend && npm run dev` (PostgreSQL·Redis: `docker compose up -d postgres redis`)

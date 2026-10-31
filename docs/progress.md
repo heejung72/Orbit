@@ -69,6 +69,6 @@
 - 임시 API 형태(#3에서 유지): `POST /matching/find`, `PUT /users/me/tastes` 등은 각 기능 이슈(#7, #13)에서 api_spec 형태로 교체
 - 메시지(REST·소켓)는 `is_mine`만 내려줌(실제 user_id 제거, PR #20). 매칭 후보 `id`는 아직 실제 user_id → #13에서 익명 참조로 교체
 - 소켓 `send_message` Rate Limit 없음 → #16에서 Redis 기반으로 추가
-- ⚠️ **현재 코드는 아직 목표 설계와 다름**: `routes/auth.js`의 Guest는 PostgreSQL `users`에 저장되고 24시간 JWT를 씀. Redis 기반 30분 Guest는 #5·#12에서 구현
+- ⚠️ **Guest는 HTTP까지만 목표 설계와 같음**: Redis 30분 세션은 #5에서 구현. 소켓 Guest·Guest 채팅(#10), 만료 카운트다운·`guest:expired`(#12)는 아직 없음
 - `src/backend/.env`는 git 제외됨. 새 환경에서는 `.env.example` 복사
 - GitHub 이슈 #17(My Orbit) 아직 미등록
