@@ -1,5 +1,6 @@
 // Orbit 초기 데이터 (docs/prd.md §3)
-// 수정 후 `npm run seed`를 다시 실행하면 새 항목만 추가됩니다. (기존 행은 이름 기준으로 건너뜀)
+// 수정 후 `npm run seed`를 다시 실행하면 코드·이름 기준으로 새 항목은 추가하고 기존 항목은 갱신합니다.
+// (삭제는 하지 않음 — 지운 항목은 DB에 그대로 남음)
 
 const avatars = [
   { code: 'comet', name: '혜성', emoji: '☄️', color: '#8C82FF' },

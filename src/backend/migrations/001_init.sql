@@ -85,6 +85,7 @@ CREATE TABLE lounge_tags (
   tag_id     INT  NOT NULL REFERENCES taste_tags(id) ON DELETE CASCADE,
   PRIMARY KEY (lounge_id, tag_id)
 );
+CREATE INDEX idx_lounge_tags_tag ON lounge_tags(tag_id);
 
 -- 라운지 참여 (회원만. Guest 참여는 Redis)
 CREATE TABLE lounge_members (

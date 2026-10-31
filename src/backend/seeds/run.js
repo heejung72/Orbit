@@ -13,7 +13,8 @@ async function seed() {
     for (const [i, a] of data.avatars.entries()) {
       await client.query(
         `INSERT INTO avatars (code, name, emoji, color, sort_order) VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (code) DO NOTHING`,
+         ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, emoji = EXCLUDED.emoji,
+           color = EXCLUDED.color, sort_order = EXCLUDED.sort_order`,
         [a.code, a.name, a.emoji, a.color, i]
       );
     }
