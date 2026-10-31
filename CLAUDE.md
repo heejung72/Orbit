@@ -17,7 +17,7 @@ Orbit은 취향 기반 익명 소셜 채팅·커뮤니티 앱이다. **1인 개�
 - PR: `gh pr create --base main --title "[TYPE] #번호 이슈 제목" --body-file <파일>`
   - 본문은 `.github/pull_request_template.md` 양식, 반드시 `Closes #번호`
 - **머지는 하지 않는다.** 사용자가 CodeRabbit 리뷰 확인 후 직접 Squash and merge 한다.
-- CodeRabbit 리뷰를 반영해 달라고 하면 `gh pr view <번호> --comments`로 확인 후 수정 커밋을 push 한다.
+- CodeRabbit 리뷰를 반영해 달라고 하면 `gh pr view <번호> --comments`로 확인 후 수정 커밋을 push 한다. 커밋 타입은 이슈 타입과 상관없이 **`[FIX] #번호 CodeRabbit 리뷰 반영`**. 오탐은 수정하지 말고 답글 문구를 사용자에게 제안한다.
 - `main`에 직접 commit/push 하지 않는다. `git push --force`, `git reset --hard`는 사용자 확인 없이 쓰지 않는다.
 
 ## 이슈를 시작할 때
