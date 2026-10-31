@@ -17,6 +17,7 @@ Closes #
 - [ ] Guest 메시지 본문을 로그에 남기지 않는다 (채팅 관련 변경 시)
 - [ ] 필요한 문서(prd / system_design / api_spec / database)를 갱신했다
 - [ ] `docs/progress.md`를 갱신했다
+- [ ] CodeRabbit 리뷰를 확인하고 반영/resolve 했다
 
-## 리뷰 포인트
-<!-- 특히 봐줬으면 하는 부분 -->
+## 메모
+<!-- 다음에 이어서 할 때 알아야 할 것, 남겨둔 TODO, CodeRabbit 지적 중 반영하지 않은 것과 이유 -->

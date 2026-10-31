@@ -33,6 +33,7 @@ reviews:
   path_instructions:
     - path: "**"
       instructions: |
+        Orbit은 취향 기반 익명 소셜 채팅·커뮤니티 앱이며, 1인 개발 프로젝트라 당신이 유일한 리뷰어입니다. 놓치기 쉬운 버그와 설계 위반을 꼼꼼히 봐주세요.
         Orbit은 취향 기반 익명 소셜 채팅·커뮤니티 앱입니다. 기획 원본은 docs/prd.md, 설계는 docs/system_design.md입니다.
         - PR 제목·커밋은 `[TYPE] #번호 요약` 형식(예: `[FEAT] #5 Guest 세션`), 브랜치는 `type/#번호-설명` 형식인지 확인하세요.
         - PR이 연결된 이슈 범위(docs/tasks.md의 해당 이슈 체크리스트)를 벗어나는 변경을 포함하면 알려주세요.
