@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
-import { api } from '../services/api';
+import { api } from '../../services/api';
 
 export default function ClubCreateScreen({ navigation }) {
   const [name, setName] = useState('');
@@ -18,7 +18,7 @@ export default function ClubCreateScreen({ navigation }) {
       return Alert.alert('알림', '동호회 이름과 카테고리를 선택해주세요');
     }
     try {
-      await api.createClub({
+      await api.createLounge({
         name,
         description,
         category_id: categoryId,

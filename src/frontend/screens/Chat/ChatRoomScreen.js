@@ -4,8 +4,8 @@ import {
   StyleSheet, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from '../services/api';
-import { joinRoom, leaveRoom, sendMessage, onNewMessage, offNewMessage } from '../services/socket';
+import { api } from '../../services/api';
+import { joinRoom, leaveRoom, sendMessage, onNewMessage, offNewMessage } from '../../services/socket';
 
 export default function ChatRoomScreen({ route, navigation }) {
   const { roomId, title } = route.params;

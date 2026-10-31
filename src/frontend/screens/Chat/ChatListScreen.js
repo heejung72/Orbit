@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
-import { api } from '../services/api';
+import { api } from '../../services/api';
 
 export default function ChatListScreen({ navigation }) {
-  const [rooms, setRooms] = useState({ direct: [], clubs: [] });
+  const [rooms, setRooms] = useState({ direct: [], lounges: [] });
   const [tab, setTab] = useState('direct');
 
   useEffect(() => {
@@ -13,14 +13,14 @@ export default function ChatListScreen({ navigation }) {
     return unsubscribe;
   }, [navigation]);
 
-  const data = tab === 'direct' ? rooms.direct : rooms.clubs;
+  const data = tab === 'direct' ? rooms.direct : rooms.lounges;
 
   const renderItem = ({ item }) => (
     <TouchableOpacity
       style={styles.room}
       onPress={() => navigation.navigate('ChatRoom', {
         roomId: item.id,
-        title: tab === 'direct' ? item.partner_nickname : item.club_name,
+        title: tab === 'direct' ? item.partner_nickname : item.lounge_name,
       })}
     >
       <View style={styles.avatar}>
@@ -30,7 +30,7 @@ export default function ChatListScreen({ navigation }) {
       </View>
       <View style={styles.roomInfo}>
         <Text style={styles.roomName}>
-          {tab === 'direct' ? item.partner_nickname : item.club_name}
+          {tab === 'direct' ? item.partner_nickname : item.lounge_name}
         </Text>
         <Text style={styles.lastMsg} numberOfLines={1}>
           {item.last_message || '아직 메시지가 없습니다'}
@@ -45,8 +45,8 @@ export default function ChatListScreen({ navigation }) {
         <TouchableOpacity style={[styles.tab, tab === 'direct' && styles.tabActive]} onPress={() => setTab('direct')}>
           <Text style={[styles.tabText, tab === 'direct' && styles.tabTextActive]}>1:1 채팅</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.tab, tab === 'clubs' && styles.tabActive]} onPress={() => setTab('clubs')}>
-          <Text style={[styles.tabText, tab === 'clubs' && styles.tabTextActive]}>동호회 채팅</Text>
+        <TouchableOpacity style={[styles.tab, tab === 'lounges' && styles.tabActive]} onPress={() => setTab('lounges')}>
+          <Text style={[styles.tabText, tab === 'lounges' && styles.tabTextActive]}>라운지 채팅</Text>
         </TouchableOpacity>
       </View>
 

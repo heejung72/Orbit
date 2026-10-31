@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from '../services/api';
+import { api } from '../../services/api';
 
 export default function LoginScreen({ navigation, onLogin, onGuestLogin }) {
   const [email, setEmail] = useState('');

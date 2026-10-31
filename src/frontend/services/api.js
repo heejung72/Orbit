@@ -30,12 +30,12 @@ export const api = {
   // 공개 API (비로그인)
   getPublicHome: () =>
     fetch(`${API_URL}/public/home`).then(r => r.json()),
-  getPublicClubs: (params = {}) => {
+  getPublicLounges: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
-    return fetch(`${API_URL}/public/clubs${qs ? `?${qs}` : ''}`).then(r => r.json());
+    return fetch(`${API_URL}/public/lounges${qs ? `?${qs}` : ''}`).then(r => r.json());
   },
-  getPublicClub: (id) =>
-    fetch(`${API_URL}/public/clubs/${id}`).then(r => r.json()),
+  getPublicLounge: (id) =>
+    fetch(`${API_URL}/public/lounges/${id}`).then(r => r.json()),
   getPublicTastes: () =>
     fetch(`${API_URL}/public/tastes`).then(r => r.json()),
 
@@ -61,15 +61,15 @@ export const api = {
   getMessages: (roomId, before) =>
     request(`/chat/rooms/${roomId}/messages${before ? `?before=${before}` : ''}`),
 
-  // 동호회
-  getClubs: (params = {}) => {
+  // 라운지
+  getLounges: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
-    return request(`/clubs${qs ? `?${qs}` : ''}`);
+    return request(`/lounges${qs ? `?${qs}` : ''}`);
   },
-  getClub: (id) => request(`/clubs/${id}`),
-  createClub: (data) => request('/clubs', { method: 'POST', body: JSON.stringify(data) }),
-  joinClub: (id) => request(`/clubs/${id}/join`, { method: 'POST' }),
-  leaveClub: (id) => request(`/clubs/${id}/leave`, { method: 'DELETE' }),
+  getLounge: (id) => request(`/lounges/${id}`),
+  createLounge: (data) => request('/lounges', { method: 'POST', body: JSON.stringify(data) }), // V2
+  joinLounge: (id) => request(`/lounges/${id}/join`, { method: 'POST' }),
+  leaveLounge: (id) => request(`/lounges/${id}/leave`, { method: 'DELETE' }),
 
   // 신고/차단
   report: (reported_id, reason, description) =>

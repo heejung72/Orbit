@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from '../services/api';
-import { disconnectSocket } from '../services/socket';
-import RadarChart from '../components/RadarChart';
+import { api } from '../../services/api';
+import { disconnectSocket } from '../../services/socket';
+import RadarChart from '../../_legacy/components/RadarChart';
 
-export default function ProfileScreen({ navigation }) {
+export default function MyOrbitScreen({ navigation }) {
   const [profile, setProfile] = useState(null);
   const [editing, setEditing] = useState(false);
   const [nickname, setNickname] = useState('');
