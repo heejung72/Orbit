@@ -1,217 +1,202 @@
-# Orbit System Design
-
-- 문서 버전: 1.0 (2026-10-31)
-- 관련: [prd.md](./prd.md) · [database.md](./database.md) · [api_spec.md](./api_spec.md)
-
----
+# 시스템 설계: Orbit
 
 ## 1. 기술 스택
-
-| 영역 | 기술 | 역할 |
-|---|---|---|
-| Mobile/Web Client | React Native + Expo (+ react-native-web) | iOS / Android / Web 앱, UI, 상태 관리 |
-| Backend | Express.js | REST API |
-| Realtime | Socket.io | 메시지, 입장·퇴장, 온라인 상태 |
-| DB | PostgreSQL 16 | 회원, 취향, 라운지, 채팅방, 회원 메시지, 질문 |
-| Cache/임시 저장 | Redis | **Guest 세션·Guest 데이터(TTL)**, 온라인 상태, Rate Limit, (확장 시) Socket.io adapter |
-| Auth | JWT + bcrypt | 회원 인증 토큰, 비밀번호 해싱 |
-| Client 토큰 저장 | **iOS·Android:** Expo SecureStore / **Web:** 미결정(HttpOnly 쿠키 vs localStorage, #5에서 결정) | 회원 JWT, Guest 세션 토큰 |
-
-> 기획 초안에서는 "Redis는 나중에 도입해도 됨"이었지만, **Guest 데이터를 PostgreSQL에 남기지 않는다는 정책** 때문에 MVP부터 Redis를 사용한다.
+- **Frontend**: React Native (iOS/Android)
+- **Backend**: Node.js + Express
+- **Database**: PostgreSQL
+- **실시간 통신**: Socket.io
+- **캐시/매칭 큐**: Redis
+- **인증**: JWT
 
 ## 2. 아키텍처
 
-```mermaid
-graph TB
-    subgraph Client
-        APP[React Native App<br/>Expo · iOS/Android/Web]
-    end
-
-    subgraph Backend
-        API[Express.js REST API<br/>auth · guest · users · tastes<br/>matching · lounges · chat · questions · reports]
-        WS[Socket.io<br/>메시지 · 입장/퇴장 · 온라인]
-        MW[Middleware<br/>memberAuth · guestAuth · optionalAuth<br/>rateLimit · profanityFilter]
-    end
-
-    subgraph Data
-        PG[(PostgreSQL<br/>Member 영구 데이터)]
-        RD[(Redis<br/>Guest 세션·임시 데이터 TTL<br/>온라인 상태 · Rate Limit)]
-    end
-
-    APP -->|HTTP| MW --> API
-    APP <-->|WebSocket| WS
-    API --> PG
-    API --> RD
-    WS --> PG
-    WS --> RD
+```
+┌─────────────┐     ┌──────────────────────────────────────┐
+│ React Native │────▶│           Node.js + Express           │
+│   Mobile App │◀────│                                      │
+└─────────────┘     │  ┌─────────┐  ┌──────────┐          │
+       │            │  │  REST   │  │ Socket.io│          │
+       │            │  │  API    │  │ (채팅)   │          │
+       ▲            │  └────┬────┘  └────┬─────┘          │
+       │            └───────┼────────────┼─────────────────┘
+   Socket.io                │            │
+                    ┌───────▼────────────▼──┐
+                    │      PostgreSQL        │
+                    │  - users              │
+                    │  - tastes             │
+                    │  - matches            │
+                    │  - messages           │
+                    │  - clubs              │
+                    │  - reports            │
+                    └───────────────────────┘
+                    ┌───────────────────────┐
+                    │        Redis          │
+                    │  - 매칭 큐            │
+                    │  - 온라인 상태         │
+                    │  - 세션 캐시           │
+                    └───────────────────────┘
 ```
 
-## 3. 인증 구조
+## 3. DB 스키마
 
-세 가지 미들웨어로 회원과 Guest가 같은 API를 함께 사용한다.
+### users
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | UUID (PK) | |
+| email | VARCHAR UNIQUE (nullable) | 게스트는 null |
+| password_hash | VARCHAR (nullable) | 게스트는 null |
+| nickname | VARCHAR | 게스트: 자동 부여 (예: 궤도여행자#3847) |
+| bio | TEXT | 자기소개 |
+| profile_image | VARCHAR | |
+| is_guest | BOOLEAN DEFAULT false | 비로그인 게스트 여부 |
+| guest_expires_at | TIMESTAMP (nullable) | 게스트 세션 만료 시각 |
+| status | ENUM | active/warned/suspended/banned |
+| report_count | INT | 누적 신고 수 |
+| created_at | TIMESTAMP | |
 
-| 미들웨어 | 허용 대상 | 검증 방법 | `req.actor` |
-|---|---|---|---|
-| `memberAuth` | 회원만 | `Authorization: Bearer <JWT>` 검증 | `{ type: 'member', id }` |
-| `guestAuth` | Guest만 | `X-Guest-Token` → Redis `guest:session:{token}` 조회 + `expires_at` 확인 | `{ type: 'guest', id, expiresAt }` |
-| `optionalAuth` | 회원·Guest 모두 | 둘 중 하나라도 유효하면 통과 | 위 둘 중 하나 |
+### taste_categories
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | SERIAL (PK) | |
+| name | VARCHAR | 음악, 영화, 운동 등 |
 
-- 공통 식별자: 코드 전반에서 **actor** = `{type, id}` 로 통일 (`member:uuid` / `guest:uuid`)
-- Socket.io 연결 시 `auth: { token }` 또는 `auth: { guestToken }` 으로 동일하게 검증
+### taste_options
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | SERIAL (PK) | |
+| category_id | FK → taste_categories | |
+| name | VARCHAR | 팝, 힙합, 액션 등 |
+| image_url | VARCHAR | 취향 옵션 대표 사진 이미지 URL |
 
-## 4. Guest 세션 설계
+### user_tastes
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| user_id | FK → users | |
+| taste_option_id | FK → taste_options | |
 
-```mermaid
-sequenceDiagram
-    participant A as App
-    participant B as Backend
-    participant R as Redis
+### matches
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | UUID (PK) | |
+| user1_id | FK → users | 요청자 |
+| user2_id | FK → users | 수신자 |
+| similarity_score | FLOAT | 유사도 점수 |
+| status | ENUM | pending/accepted/rejected |
+| created_at | TIMESTAMP | |
 
-    A->>B: POST /api/guest/session
-    B->>R: SET guest:session:{token} {guestId, nickname, avatar, expiresAt} EX 1800
-    B-->>A: guestToken, nickname, avatar, expiresAt
-    A->>A: guestToken 저장(앱: SecureStore), 카운트다운 시작
+### chat_rooms
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | UUID (PK) | |
+| type | ENUM | direct/club |
+| match_id | FK → matches (nullable) | 1:1일 때 |
+| club_id | FK → clubs (nullable) | 동호회일 때 |
+| created_at | TIMESTAMP | |
 
-    A->>B: (모든 요청) X-Guest-Token
-    B->>R: 세션 조회 + expiresAt 검증
-    alt 만료
-        B-->>A: 401 GUEST_EXPIRED
-    end
+### messages
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | UUID (PK) | |
+| chat_room_id | FK → chat_rooms | |
+| sender_id | FK → users (nullable) | 게스트는 guest_session_id로 식별 |
+| guest_session_id | VARCHAR (nullable) | 비로그인 게스트 발신자 식별용 |
+| content | TEXT | |
+| type | ENUM | text/image |
+| created_at | TIMESTAMP | |
 
-    Note over B: expiresAt 도달 (소켓별 만료 타이머)
-    B-->>A: socket 'guest:expired'
-    B->>B: 해당 guest 소켓 disconnect + 방 퇴장 브로드캐스트
-    B->>R: guest:* 키 삭제
-    A->>A: 로컬 토큰 삭제 → Welcome 이동
+### clubs (동호회)
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | UUID (PK) | |
+| name | VARCHAR | |
+| description | TEXT | |
+| category_id | FK → taste_categories | |
+| owner_id | FK → users | |
+| max_members | INT | |
+| created_at | TIMESTAMP | |
 
-    Note over B: 보조 스케줄러 (매 30초)
-    B->>B: 타이머에서 누락된 만료 소켓·키 정리
-```
+### club_members
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| club_id | FK → clubs | |
+| user_id | FK → users | |
+| role | ENUM | owner/admin/member |
+| joined_at | TIMESTAMP | |
 
-### 4-1. Redis 키 설계 (Guest)
-| 키 | 타입 | 내용 | TTL |
-|---|---|---|---|
-| `guest:session:{token}` | Hash | guestId, nickname, avatarId, createdAt, expiresAt | expiresAt까지 |
-| `guest:id:{guestId}` | String | token (역조회) | 동일 |
-| `guest:tastes:{guestId}` | Hash | tagId → weight | 동일 |
-| `guest:rooms:{guestId}` | Set | 참여 중인 roomId | 동일 |
-| `room:{roomId}:guestmsgs` | List | Guest가 포함된 1:1 방 / 라운지의 Guest 메시지 JSON | 해당 guest 만료 시 정리 |
-| `guest:answers:{guestId}` | Hash | questionId → 답변 | 동일 |
-| `guest:msgcount:{guestId}` | String | 보낸 메시지 수 (가입 유도 트리거) | 동일 |
+### reports (신고)
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | UUID (PK) | |
+| reporter_id | FK → users | |
+| reported_id | FK → users | |
+| reason | ENUM | harassment/spam/inappropriate/other |
+| description | TEXT | |
+| status | ENUM | pending/resolved |
+| created_at | TIMESTAMP | |
 
-### 4-2. 원칙
-- **절대 시간제**: `expiresAt = createdAt + 30분`, 갱신하지 않는다.
-- **TTL에만 의존하지 않는다**: 모든 HTTP 요청·소켓 이벤트에서 `expiresAt`을 서버가 직접 확인.
-- **만료 시점에 즉시 종료한다**: Guest 소켓이 연결되면 `expiresAt - now` 후에 실행되는 만료 타이머를 등록한다. 타이머는 `guest:expired` 이벤트를 **먼저 보낸 뒤** 연결을 끊는다(끊은 뒤에는 이벤트를 받을 수 없음).
-- **30초 스케줄러는 보조 수단**이다. 서버 재시작 등으로 타이머가 누락된 소켓과 Redis 키만 정리한다.
-- **수신자도 확인한다**: 방에 메시지를 브로드캐스트할 때 수신자 중 만료된 Guest 소켓은 제외(그리고 즉시 종료)한다.
-- **로그 금지**: Guest 메시지 본문은 console/에러 로그/분석 이벤트에 남기지 않는다. 로거에서 `content` 필드 마스킹.
-- 신고 시에만 해당 메시지 스냅샷을 `reports`에 저장 (예외).
+### blocks (차단)
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| blocker_id | FK → users | |
+| blocked_id | FK → users | |
+| created_at | TIMESTAMP | |
 
-### 4-3. 메시지 저장 규칙
-| 상황 | 저장 위치 |
-|---|---|
-| Member ↔ Member 1:1 | PostgreSQL `messages` |
-| Member/Guest ↔ Guest 1:1 | Redis `room:{id}:guestmsgs` (방 전체를 임시방으로 취급) |
-| 라운지에서 Member가 보낸 메시지 | PostgreSQL `messages` |
-| 라운지에서 Guest가 보낸 메시지 | Redis (만료 시 삭제) |
+## 4. API 설계
 
-> 라운지 히스토리 조회 시 PostgreSQL + Redis를 시간순 병합해서 반환.
+### 인증
+- POST /api/auth/register — 회원가입
+- POST /api/auth/login — 로그인
+- POST /api/auth/guest — 게스트 세션 생성 (임시 닉네임 + 세션 토큰 발급)
 
-### 4-4. Guest → 회원 전환 (#14)
-1. Guest가 `POST /api/auth/register` 요청 시 `X-Guest-Token`을 함께 보냄
-2. 서버 트랜잭션:
-   - users 생성
-   - `guest:tastes` → `user_tastes` INSERT
-   - `guest:rooms`의 방 → `chat_members`의 actor를 member로 교체, 방의 `is_temporary=false`
-   - `room:{id}:guestmsgs`에서 **가입한 Guest 본인이 보낸 메시지만** → `messages` INSERT (sender = 새 userId)
-   - 같은 방의 **Member 메시지**는 원래 작성자(sender_id)를 그대로 유지한다 (이미 PG에 있으면 그대로, Redis에 있으면 원 작성자로 INSERT)
-   - **다른 Guest(가입하지 않은 상대)의 메시지는 PostgreSQL로 이전하지 않는다** — Guest 메시지 보관 정책 유지. 해당 Guest 만료 시 Redis에서 삭제
-   - `guest:answers` → `question_answers` INSERT
-3. Redis guest 키 삭제, 소켓 재인증(`auth:upgrade` 이벤트)
-4. 상대방 화면에서는 닉네임·캐릭터가 그대로 유지됨 (가입 시 Guest 닉네임 유지 옵션 기본 ON)
+### 비로그인 접근 (공개 API)
+- GET /api/public/home — 홈 화면 (인기 취향, 추천 동호회 등)
+- GET /api/public/clubs — 동호회 목록 열람
+- GET /api/public/clubs/:id — 동호회 상세 열람
 
-> 상대방도 Guest인 1:1 방은, 가입한 쪽 기록만 남고 상대 Guest 만료 시 상대 메시지는 "사라진 궤도의 메시지"로 표시 여부를 #14에서 결정.
+### 프로필
+- GET /api/users/me — 내 프로필
+- PUT /api/users/me — 프로필 수정
+- PUT /api/users/me/tastes — 취향 업데이트
 
-## 5. 실시간(Socket.io) 이벤트
+### 매칭
+- POST /api/matching/find — 매칭 요청 (유사도 기반)
+- POST /api/matching/:id/accept — 매칭 수락
+- POST /api/matching/:id/reject — 매칭 거절
 
-| 방향 | 이벤트 | payload | 설명 |
-|---|---|---|---|
-| C→S | `room:join` | `{roomId}` | 1:1 방 또는 라운지 입장 |
-| C→S | `room:leave` | `{roomId}` | 퇴장 |
-| C→S | `message:send` | `{roomId, content, clientId}` | 메시지 전송 (필터·Rate Limit 적용) |
-| C→S | `typing` | `{roomId}` | 입력 중 |
-| S→C | `message:new` | `{id, roomId, sender:{displayName, avatarId}, content, createdAt}` | 새 메시지 |
-| S→C | `room:presence` | `{roomId, count}` | 라운지 참여 인원 |
-| S→C | `match:request` / `match:accepted` | `{matchId, ...}` | 매칭 |
-| S→C | `guest:warning` | `{remainingSec: 300}` | 만료 5분 전 (가입 유도) |
-| S→C | `guest:expired` | `{}` | 만료, 서버가 연결 종료 |
-| S→C | `signup:nudge` | `{reason}` | 메시지 수 기준 가입 유도 |
-| S→C | `error` | `{code, message}` | `RATE_LIMITED`, `BLOCKED_WORD` 등 |
+### 채팅
+- GET /api/chat/rooms — 내 채팅방 목록
+- GET /api/chat/rooms/:id/messages — 메시지 조회
+- Socket: message:send — 메시지 전송
+- Socket: message:receive — 메시지 수신
 
-## 6. 매칭 알고리즘 (#13)
+### 동호회
+- POST /api/clubs — 동호회 생성
+- GET /api/clubs — 동호회 목록 (카테고리 필터)
+- GET /api/clubs/:id — 동호회 상세
+- POST /api/clubs/:id/join — 가입
+- DELETE /api/clubs/:id/leave — 탈퇴
 
-```
-vec(user) = { tagId: weight(1~3) * categoryWeight }
-similarity(A, B) = Σ(A_i * B_i) / (‖A‖ * ‖B‖)
-```
-1. 후보군: 현재 온라인 actor (Redis `online:actors`) 중 본인 제외
-2. 제외: 차단 관계(양방향), 이미 활성 1:1 방이 있는 상대, 최근 거절한 상대(24h)
-3. 유사도 상위 N명(기본 10) + 공통 태그 상위 3개 반환
-4. 후보가 부족하면 빈 목록 + "지금은 비슷한 사람이 없어요, 라운지를 둘러보세요" 안내 (PRD §3-2: **현재 접속 중인 Member·Guest만** 대상)
-   - 오프라인 Member 확장은 V2 검토 항목
+### 신고/차단
+- POST /api/reports — 신고
+- POST /api/blocks — 차단
+- DELETE /api/blocks/:userId — 차단 해제
 
-## 7. 디렉토리 구조 (목표, #2에서 적용)
+## 5. 게스트(비로그인) 정책
+- 게스트 세션은 앱 종료 또는 24시간 경과 시 자동 만료
+- 만료된 게스트의 메시지·프로필은 배치 작업으로 삭제 (CRON)
+- 게스트는 채팅 참여만 가능 (매칭 요청, 동호회 생성, 신고 불가)
+- 채팅방 내 "게스트" 뱃지 표시
+- Redis에 게스트 세션 TTL 관리
 
-```
-src/
-├── frontend/
-│   ├── App.js
-│   ├── navigation/          # RootNavigator, MainTabs
-│   ├── screens/
-│   │   ├── Welcome/
-│   │   ├── Auth/            # Login, Register
-│   │   ├── GuestEntry/
-│   │   ├── TasteSelect/
-│   │   ├── Home/
-│   │   ├── Lounge/          # LoungeList, LoungeChat
-│   │   ├── Chat/            # ChatList, ChatRoom, Matching
-│   │   ├── TodayQuestion/
-│   │   └── MyOrbit/
-│   ├── components/
-│   │   ├── OrbitVisualization/
-│   │   ├── Avatar/
-│   │   ├── TasteTags/
-│   │   ├── GuestTimer/
-│   │   └── SignupNudgeModal/
-│   ├── context/             # AuthContext (actor, token, expiresAt)
-│   ├── theme/               # colors, typography, spacing
-│   └── services/            # api.js, socket.js, storage.js
-│
-├── backend/
-│   ├── server.js
-│   ├── db.js
-│   ├── redis.js
-│   ├── routes/              # auth, guest, users, tastes, matching, lounges, chat, questions, reports
-│   ├── services/            # guestSession, matching, chat, orbit, migration(guest→member)
-│   ├── socket/              # index.js, handlers/
-│   ├── middleware/          # memberAuth, guestAuth, optionalAuth, rateLimit, profanityFilter
-│   ├── jobs/                # guestExpiry
-│   ├── migrations/
-│   └── seeds/               # 취향 태그, 라운지, 오늘의 질문
-│
-docs/  (prd, system_design, database, api_spec, tasks, progress, deploy)
-```
+## 6. 취향 시각화
+- taste_options 테이블에 image_url 필드로 각 취향 옵션별 대표 사진 저장
+- 프론트엔드에서 취향 유사도를 레이더 차트(오각형)로 렌더링
+- 매칭 상대와의 취향 겹침을 벤다이어그램으로 시각화
+- 홈 화면 "오늘의 매칭" 카드에 취향 사진 이미지 + 유사도 % 표시
 
-## 8. 환경 변수 (`src/backend/.env.example`)
-| 변수 | 예시 | 설명 |
-|---|---|---|
-| `PORT` | 3000 | |
-| `DATABASE_URL` | postgres://localhost:5432/orbit | |
-| `REDIS_URL` | redis://localhost:6379 | |
-| `JWT_SECRET` | (랜덤 문자열) | |
-| `JWT_EXPIRES_IN` | 7d | |
-| `GUEST_SESSION_MINUTES` | 30 | Guest 이용 시간 |
-| `GUEST_WARNING_MINUTES` | 5 | 만료 경고 시점 |
-| `GUEST_NUDGE_MESSAGE_COUNT` | 20 | 가입 유도 메시지 수 |
-| `CORS_ORIGIN` | http://localhost:8081 | |
+## 7. 매칭 알고리즘
+1. 유저의 취향을 벡터로 변환 (원-핫 인코딩)
+2. 코사인 유사도 계산
+3. 유사도 높은 순으로 후보 정렬
+4. 이미 매칭/차단된 유저 제외
+5. 상위 후보를 매칭 제안

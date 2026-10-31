@@ -1,4 +1,4 @@
--- Orbit DB Schema (구버전, #3에서 재설계 예정)
+-- TasteMate DB Schema
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
