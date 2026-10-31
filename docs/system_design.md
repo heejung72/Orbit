@@ -53,8 +53,8 @@ graph TB
 | 미들웨어 | 허용 대상 | 검증 방법 | `req.actor` |
 |---|---|---|---|
 | `memberAuth` | 회원만 | `Authorization: Bearer <JWT>` 검증 | `{ type: 'member', id }` |
-| `guestAuth` | Guest만 | `X-Guest-Token` → Redis `guest:session:{token}` 조회 + `expires_at` 확인 | `{ type: 'guest', id, expiresAt }` |
-| `optionalAuth` | 회원·Guest 모두 | 둘 중 하나라도 유효하면 통과 | 위 둘 중 하나 |
+| `guestAuth` | Guest만 | `X-Guest-Token` → Redis `guest:session:{sha256(token)}` 조회 + `expiresAt` 직접 비교 | `{ type: 'guest', id, expiresAt }` (+ `req.guest`) |
+| `optionalAuth` | 회원·Guest 모두 | Bearer가 있으면 회원 검증, 없고 `X-Guest-Token`이 있으면 Guest 검증 | 위 둘 중 하나 (Guest는 `req.userId` 없음) |
 
 - 공통 식별자: 코드 전반에서 **actor** = `{type, id}` 로 통일 (`member:uuid` / `guest:uuid`)
 - Socket.io 연결 시 `auth: { token }` 또는 `auth: { guestToken }` 으로 동일하게 검증
@@ -68,7 +68,7 @@ sequenceDiagram
     participant R as Redis
 
     A->>B: POST /api/guest/session
-    B->>R: SET guest:session:{token} {guestId, nickname, avatar, expiresAt} EX 1800
+    B->>R: HSET guest:session:{sha256(token)} {guestId, nickname, avatarId, expiresAt} + PEXPIREAT
     B-->>A: guestToken, nickname, avatar, expiresAt
     A->>A: guestToken 저장(앱: SecureStore), 카운트다운 시작
 
@@ -91,8 +91,8 @@ sequenceDiagram
 ### 4-1. Redis 키 설계 (Guest)
 | 키 | 타입 | 내용 | TTL |
 |---|---|---|---|
-| `guest:session:{token}` | Hash | guestId, nickname, avatarId, createdAt, expiresAt | expiresAt까지 |
-| `guest:id:{guestId}` | String | token (역조회) | 동일 |
+| `guest:session:{sha256(token)}` | Hash | guestId, nickname, avatarId, avatarEmoji, expiresAt (토큰 원본은 저장하지 않음) | expiresAt까지 (#5) |
+| `guest:id:{guestId}` | String | 세션 키 (역조회, 강제 종료용) | 동일 (#12에서 추가) |
 | `guest:tastes:{guestId}` | Hash | tagId → weight | 동일 |
 | `guest:rooms:{guestId}` | Set | 참여 중인 roomId | 동일 |
 | `room:{roomId}:guestmsgs` | List | Guest가 포함된 1:1 방 / 라운지의 Guest 메시지 JSON | 해당 guest 만료 시 정리 |

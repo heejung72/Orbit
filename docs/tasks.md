@@ -11,9 +11,9 @@
 |---|---|---|---|---|
 | 1 | [DOCS] 프로젝트 재정비 및 Git/브랜치 전략 세팅 | `docs/#1-project-setup` | - | ✅ |
 | 2 | [REFACTOR] 디렉토리 구조 개편 | `refactor/#2-directory-structure` | 1 | ✅ |
-| 3 | [REFACTOR] 스키마 재설계 | `refactor/#3-db-schema` | 2 | 🟨 |
+| 3 | [REFACTOR] 스키마 재설계 | `refactor/#3-db-schema` | 2 | ✅ |
 | 4 | [FEAT] 회원 인증 | `feat/#4-member-auth` | 3 | ⬜ |
-| 5 | [FEAT] Guest 세션 | `feat/#5-guest-session` | 3 | ⬜ |
+| 5 | [FEAT] Guest 세션 | `feat/#5-guest-session` | 3 | 🟨 |
 | 6 | [FEAT] Welcome 화면 | `feat/#6-welcome` | 4, 5 | ⬜ |
 | 7 | [FEAT] 취향 시스템 | `feat/#7-taste-system` | 4, 5 | ⬜ |
 | 8 | [FEAT] Orbit Dashboard (Home) | `feat/#8-dashboard` | 7, 9 | ⬜ |
@@ -27,7 +27,7 @@
 | 16 | [FEAT] 신고·차단, 비속어 필터·스팸 Rate Limit | `feat/#16-safety` | 10 | ⬜ |
 | 17 | [FEAT] My Orbit *(GitHub 이슈 미등록 — 등록 필요)* | `feat/#17-my-orbit` | 7, 9 | ⬜ |
 
-**권장 진행 순서:** 1 → 2 → 3 → 4 → 5 → 6 → 9 → 7 → 8 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17
+**권장 진행 순서:** 1 → 2 → 3 → **5 → 4** → 6 → 9 → 7 → 8 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17
 
 ---
 
@@ -117,15 +117,28 @@
 - [ ] 입력 검증(이메일 형식, 비밀번호 8자 이상, 닉네임 2~12자)
 
 ## #5 [FEAT] Guest 세션
-- [ ] `redis.js` 연결
-- [ ] `POST /guest/session` — 랜덤 닉네임("형용사 + 명사", 예: 익명의 여행자) + 기본 캐릭터 + `expiresAt = now+30m`
-- [ ] Redis 키 저장 ([system_design.md §4-1](./system_design.md))
-- [ ] `guestAuth` 미들웨어, `optionalAuth`에 Guest 지원 추가
-- [ ] `guestAuth`가 **모든 HTTP 요청마다** `expiresAt`을 직접 검사 → 지났으면 `401 GUEST_EXPIRED` (TTL에만 의존 X)
-- [ ] 기존 `routes/auth.js`의 PG 기반 Guest(24h JWT) 제거
-- [ ] `optionalAuth`의 Guest 경로를 Redis 세션 `expiresAt` 직접 검사로 교체 (JWT `exp`로 대체 X) — PR #19 CodeRabbit 지적
-- [ ] 앱: guestToken SecureStore 저장, `AuthContext`에 actor 타입 반영
-- [ ] GuestEntry 화면 (발급된 닉네임·캐릭터, "30분 동안 머물 수 있어요" 안내)
+**설계:** [system_design.md §3·§4](./system_design.md) · GitHub 이슈 #5 본문
+### Backend
+- [x] `redis.js`: 서버 시작 시 연결, 미연결이면 `getRedis()`가 throw → Guest 기능만 503
+- [x] `services/guestSession.js`: 발급(32바이트 토큰, Redis 키는 SHA-256 해시, `PEXPIREAT` 30분) / 조회(**expiresAt 직접 비교**) / 삭제
+- [x] `POST /api/guest/session` (닉네임 "형용사 명사 4자리" + 랜덤 캐릭터), `DELETE /api/guest/session`
+- [x] `guestAuth` 구현, `memberAuth` 독립(JWT만, Guest 토큰이면 403 `MEMBER_ONLY`), `optionalAuth` = Bearer 우선 → 없으면 Guest
+- [x] `GET /api/auth/me` (회원·Guest 공통, Guest는 `expires_at` 포함)
+- [x] 예전 PG Guest 제거: `POST /auth/guest`, JWT `isGuest` 거부(HTTP·소켓 공통 `verifyMemberToken`)
+- [x] Guest 허용 범위: 라운지 읽기·취향 카테고리·공개 API·`/auth/me` / users·chat은 `memberAuth`로 이동, 라운지 참여·나가기 403
+### Frontend
+- [x] `services/storage.js`: 네이티브 SecureStore / 웹 localStorage(`shortcut:`), `clearSession()`
+- [x] `api.js`: `X-Guest-Token` 헤더, `GUEST_EXPIRED` → 세션 정리 후 로그인 화면, `err.code` 전달
+- [x] 회원 JWT도 SecureStore로 이동 (Login·App·socket·MyOrbit 로그아웃)
+- [x] 로그인 "둘러보기" → `GuestEntry`(캐릭터·닉네임·종료 시각) → "둘러보기 시작"
+- [x] 앱 재시작 시 Guest 만료 시각 확인, 지났으면 세션 정리
+### 확인
+- [x] Guest 시나리오 24개 (발급, 해시 저장, TTL, 허용/차단 범위, 위조·만료·삭제 토큰, TTL 남아도 expiresAt 지나면 401, 옛 Guest JWT 거부)
+- [x] Redis 중단 시 Guest 503·회원/공개 API 정상, 기존 API·소켓·리뷰 시나리오 회귀 없음, 웹 빌드 성공
+- [x] 저장소 테스트 `src/backend/tests/guest.e2e.js` (`npm run test:guest`, 서버·Redis 실행 필요) — 8개
+- [x] 셀프 리뷰(ponytail-review): Must 0 / Should 2 반영(발급 시 Redis multi, 테스트 추가) / Nice 1 반영(Redis 로그 정리)
+### 하지 않은 것
+- 소켓 Guest 연결·Guest 채팅 → #10 / 만료 카운트다운·`guest:expired`·`guest:id` 역조회 → #12 / 가입 시 이전 → #14 / 발급 Rate Limit → #16
 
 ## #6 [FEAT] Welcome 화면
 - [ ] Orbit 로고/카피 "Find your people in the same orbit."

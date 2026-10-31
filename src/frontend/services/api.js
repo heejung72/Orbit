@@ -1,20 +1,34 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import config from '../config';
+import { secureStorage, clearSession } from './storage';
 
 const API_URL = config.API_URL;
 
+// Guest 시간이 끝났을 때 App이 로그인 화면으로 돌아가도록 등록하는 콜백
+let onSessionExpired = null;
+export const setOnSessionExpired = (fn) => { onSessionExpired = fn; };
+
 async function request(path, options = {}) {
-  const token = await AsyncStorage.getItem('token');
+  const token = await secureStorage.get('token');
+  const guestToken = token ? null : await secureStorage.get('guestToken');
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(guestToken ? { 'X-Guest-Token': guestToken } : {}),
       ...options.headers,
     },
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || '요청 실패');
+  if (!res.ok) {
+    if (data.code === 'GUEST_EXPIRED') {
+      await clearSession();
+      onSessionExpired?.();
+    }
+    const err = new Error(data.error || '요청 실패');
+    err.code = data.code;
+    throw err;
+  }
   return data;
 }
 
@@ -24,8 +38,10 @@ export const api = {
     request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   register: (email, password, nickname) =>
     request('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, nickname }) }),
-  guestLogin: () =>
-    request('/auth/guest', { method: 'POST' }),
+  me: () => request('/auth/me'),
+
+  // Guest (30분 둘러보기)
+  createGuestSession: () => request('/guest/session', { method: 'POST' }),
 
   // 공개 API (비로그인)
   getPublicHome: () =>

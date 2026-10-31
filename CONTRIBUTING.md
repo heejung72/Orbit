@@ -118,8 +118,11 @@ PR 본문 "메모"에 결과를 한 줄로 남깁니다. (예: `셀프 리뷰: M
 1. PR의 **Files changed** 탭에서 변경 파일을 한 번 훑기
 2. CodeRabbit 리뷰 확인 → 반영 또는 resolve
 3. 템플릿 체크리스트 체크
-4. **Squash and merge** → 브랜치 삭제
-5. 다음 이슈 브랜치의 첫 커밋에서 `progress.md`에 완료 반영 (§5)
+4. **CodeRabbit 체크가 ✅(완료)인지 확인** — 마지막 push 직후 바로 머지하면 리뷰가 취소되어 체크가 ❌(`Cancelled - Pull request is closed`)로 남음
+5. **Squash and merge** → 브랜치 삭제
+6. 다음 이슈 브랜치의 첫 커밋에서 `progress.md`에 완료 반영 (§5)
+
+> CodeRabbit 무료 플랜은 **시간당 리뷰 10회**. 리뷰 반영 커밋은 모아서 한 번에 push한다.
 
 ## 5. 머지 후
 ```bash

@@ -36,7 +36,7 @@ router.post('/', (req, res) => {
 // 라운지 참여 (회원만 PG에 기록. Guest 참여는 #11에서 Redis로)
 router.post('/:id/join', async (req, res) => {
   if (req.isGuest) {
-    return res.status(403).json({ error: '회원만 라운지에 참여할 수 있어요' });
+    return res.status(403).json({ error: '회원만 라운지에 참여할 수 있어요', code: 'MEMBER_ONLY' });
   }
   const loungeId = toUuid(req.params.id);
   if (!loungeId) return res.status(404).json({ error: '라운지를 찾을 수 없습니다' });
@@ -63,6 +63,9 @@ router.post('/:id/join', async (req, res) => {
 
 // 라운지 나가기
 router.delete('/:id/leave', async (req, res) => {
+  if (req.isGuest) {
+    return res.status(403).json({ error: '회원만 라운지에 참여할 수 있어요', code: 'MEMBER_ONLY' });
+  }
   const loungeId = toUuid(req.params.id);
   if (!loungeId) return res.status(404).json({ error: '라운지를 찾을 수 없습니다' });
   try {

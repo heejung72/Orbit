@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken');
+const { verifyMemberToken } = require('../middleware/memberAuth');
 const db = require('../db');
 const { filterMessage, containsBadWords } = require('../middleware/profanityFilter');
 const { getRoomForMember } = require('../services/chatAccess');
@@ -8,19 +8,15 @@ const { getRoomForMember } = require('../services/chatAccess');
 //            모든 이벤트에서 Guest expiresAt 검사
 // TODO(#16): send_message 사용자 단위 Rate Limit (Redis)
 function setupSocket(io) {
-  // 인증: 회원 JWT만 허용 (Guest는 #5에서 guestToken으로 추가)
+  // 인증: 회원 JWT만 허용 (Guest 소켓은 #10)
   io.use((socket, next) => {
     const token = socket.handshake.auth.token;
     if (!token) return next(new Error('인증이 필요합니다'));
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      if (decoded.isGuest) return next(new Error('Guest 연결은 준비 중입니다'));
-      socket.userId = decoded.userId;
-      socket.data.userId = decoded.userId; // fetchSockets()에서 읽기 위해
-      next();
-    } catch {
-      next(new Error('유효하지 않은 토큰입니다'));
-    }
+    const userId = verifyMemberToken(token);
+    if (!userId) return next(new Error('유효하지 않은 토큰입니다'));
+    socket.userId = userId;
+    socket.data.userId = userId; // fetchSockets()에서 읽기 위해
+    next();
   });
 
   io.on('connection', (socket) => {

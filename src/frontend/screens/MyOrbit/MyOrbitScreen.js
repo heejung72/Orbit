@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearSession } from '../../services/storage';
 import { api } from '../../services/api';
 import { disconnectSocket } from '../../services/socket';
 import RadarChart from '../../_legacy/components/RadarChart';
@@ -30,7 +30,7 @@ export default function MyOrbitScreen({ navigation, onLogout }) {
 
   const handleLogout = async () => {
     disconnectSocket();
-    await AsyncStorage.multiRemove(['token', 'user', 'isGuest']);
+    await clearSession();
     onLogout?.();
   };
 

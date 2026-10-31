@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
+const optionalAuth = require('../middleware/optionalAuth');
 
 const router = express.Router();
 
@@ -70,10 +71,22 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// 이전 뼈대의 PostgreSQL 기반 Guest 로그인 — #3에서 Guest 컬럼을 제거하면서 비활성화
-// #5에서 Redis 기반 POST /api/guest/session 으로 대체됩니다.
-router.post('/guest', (req, res) => {
-  res.status(501).json({ error: '둘러보기 기능을 준비 중이에요. 잠시 후 다시 이용해주세요.' });
+// 현재 사용자 (회원·Guest 공통). Guest는 남은 시간 계산용 expiresAt 포함
+router.get('/me', optionalAuth, async (req, res) => {
+  if (req.isGuest) {
+    const { nickname, avatarId, avatarEmoji, expiresAt } = req.guest;
+    return res.json({ type: 'guest', nickname, avatar_id: avatarId, avatar_emoji: avatarEmoji, expires_at: new Date(expiresAt).toISOString() });
+  }
+  try {
+    const { rows } = await db.query(
+      `SELECT u.nickname, u.avatar_id, a.emoji AS avatar_emoji FROM users u JOIN avatars a ON a.id = u.avatar_id WHERE u.id = $1`,
+      [req.userId]
+    );
+    if (rows.length === 0) return res.status(401).json({ error: '유효하지 않은 토큰입니다', code: 'UNAUTHORIZED' });
+    res.json({ type: 'member', ...rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: '서버 오류가 발생했습니다' });
+  }
 });
 
 module.exports = router;

@@ -1,24 +1,12 @@
-const jwt = require('jsonwebtoken');
+const memberAuth = require('./memberAuth');
+const guestAuth = require('./guestAuth');
 
-// 회원·Guest 모두 허용
-// 현재: 기존 뼈대 방식(JWT 하나로 회원/Guest 구분, decoded.isGuest) 그대로 유지
-// 목표(#5): Authorization(JWT) 또는 X-Guest-Token(Redis 세션) 중 하나가 유효하면 통과 — docs/system_design.md §3
+// 회원·Guest 모두 허용 — docs/system_design.md §3
+// Authorization: Bearer <JWT> 가 있으면 회원, 없고 X-Guest-Token이 있으면 Guest
+// Guest 요청에는 req.userId가 없으므로, 라우트는 req.isGuest로 분기해야 한다
 function optionalAuth(req, res, next) {
-  const header = req.headers.authorization;
-  if (!header || !header.startsWith('Bearer ')) {
-    return res.status(401).json({ error: '인증이 필요합니다' });
-  }
-
-  try {
-    const token = header.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.userId = decoded.userId;
-    req.isGuest = decoded.isGuest || false;
-    req.actor = { type: req.isGuest ? 'guest' : 'member', id: decoded.userId };
-    next();
-  } catch {
-    return res.status(401).json({ error: '유효하지 않은 토큰입니다' });
-  }
+  if (memberAuth.bearerOf(req) || !req.headers['x-guest-token']) return memberAuth(req, res, next);
+  return guestAuth(req, res, next);
 }
 
 module.exports = optionalAuth;
