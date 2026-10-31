@@ -1,7 +1,7 @@
 {
   "name": "orbit-backend",
   "version": "1.0.0",
-  "description": "Orbit - 취향 기반 소셜 매칭 앱 백엔드",
+  "description": "Orbit - 취향 기반 익명 소셜 채팅·커뮤니티 백엔드",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
