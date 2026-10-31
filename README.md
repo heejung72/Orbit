@@ -116,7 +116,8 @@ sequenceDiagram
 
     U->>F: 채팅 시작
     F->>B: POST /api/chat/rooms
-    F<-->B: Socket.io 실시간 메시지
+    F->>B: Socket.io 메시지 전송
+    B-->>F: Socket.io 실시간 메시지 수신
 ```
 
 ## 실행 방법
