@@ -12,43 +12,58 @@ const signToken = (userId) =>
 // 실제 user_id·이메일은 응답에 넣지 않음 (docs/prd.md §3-6)
 const publicUser = (u) => ({ nickname: u.nickname, avatar_id: u.avatar_id });
 
+// 가입 규칙 — 앱(RegisterScreen)과 같은 기준
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const normalizeEmail = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : null);
+
 // 회원가입
-// TODO(#4): 입력 검증 강화(이메일 형식, 비밀번호 8자, 닉네임 2~12자), avatarId 선택
 // TODO(#14): X-Guest-Token이 있으면 Guest 데이터 이전
 router.post('/register', async (req, res) => {
+  const { password, nickname, avatar_id } = req.body || {};
+  const email = normalizeEmail(req.body && req.body.email);
+  const nick = typeof nickname === 'string' ? nickname.trim() : '';
+
+  if (!email || !EMAIL_RE.test(email) || email.length > 255) {
+    return res.status(400).json({ error: '이메일 형식을 확인해주세요' });
+  }
+  // bcrypt는 72바이트 이후를 무시하므로 상한을 둔다
+  if (typeof password !== 'string' || password.length < 8 || Buffer.byteLength(password) > 72) {
+    return res.status(400).json({ error: '비밀번호는 8자 이상 72바이트 이하로 입력해주세요' });
+  }
+  if (nick.length < 2 || nick.length > 12) {
+    return res.status(400).json({ error: '닉네임은 2~12자로 입력해주세요' });
+  }
+  if (avatar_id !== undefined && avatar_id !== null && !(Number.isInteger(avatar_id) && avatar_id > 0)) {
+    return res.status(400).json({ error: '캐릭터를 다시 선택해주세요' });
+  }
+
   try {
-    const { email, password, nickname, avatar_id } = req.body;
-
-    if (!email || !password || !nickname) {
-      return res.status(400).json({ error: '이메일, 비밀번호, 닉네임을 입력해주세요' });
-    }
-
-    const existing = await db.query('SELECT 1 FROM users WHERE email = $1', [email]);
-    if (existing.rows.length > 0) {
-      return res.status(409).json({ error: '이미 가입된 이메일입니다' });
-    }
-
     const passwordHash = await bcrypt.hash(password, 12);
     const { rows } = await db.query(
       `INSERT INTO users (email, password_hash, nickname, avatar_id)
        VALUES ($1, $2, $3, COALESCE($4, 1))
-       RETURNING id, email, nickname, avatar_id`,
-      [email, passwordHash, nickname, avatar_id || null]
+       RETURNING id, nickname, avatar_id`,
+      [email, passwordHash, nick, avatar_id ?? null]
     );
-
     res.status(201).json({ token: signToken(rows[0].id), user: publicUser(rows[0]) });
   } catch (err) {
+    // 중복 확인을 INSERT에 맡겨 동시 가입에도 409 하나만 성공
+    if (err.code === '23505') return res.status(409).json({ error: '이미 가입된 이메일입니다' });
+    if (err.code === '23503') return res.status(400).json({ error: '캐릭터를 다시 선택해주세요' });
     res.status(500).json({ error: '서버 오류가 발생했습니다' });
   }
 });
 
 // 로그인
 router.post('/login', async (req, res) => {
+  const email = normalizeEmail(req.body && req.body.email);
+  const { password } = req.body || {};
+  if (!email || typeof password !== 'string' || !password) {
+    return res.status(400).json({ error: '이메일과 비밀번호를 입력해주세요' });
+  }
   try {
-    const { email, password } = req.body;
-
     const result = await db.query(
-      'SELECT id, email, nickname, avatar_id, password_hash, status FROM users WHERE email = $1',
+      'SELECT id, nickname, avatar_id, password_hash, status FROM users WHERE email = $1',
       [email]
     );
     if (result.rows.length === 0) {

@@ -1,25 +1,40 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
 import { api } from '../../services/api';
+import { saveMemberSession } from '../../services/storage';
+import { colors, spacing, radius, typography } from '../../theme';
 
-export default function RegisterScreen({ navigation }) {
+// 서버(routes/auth.js)와 같은 가입 규칙
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export default function RegisterScreen({ onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [nickname, setNickname] = useState('');
+  const [avatars, setAvatars] = useState([]);
+  const [avatarId, setAvatarId] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    api.getAvatars()
+      .then((list) => {
+        setAvatars(list);
+        setAvatarId(list[0]?.id ?? null);
+      })
+      .catch(() => {}); // 목록을 못 받아도 서버 기본 캐릭터로 가입 가능
+  }, []);
+
   const handleRegister = async () => {
-    if (!email || !password || !nickname) {
-      return Alert.alert('알림', '모든 항목을 입력해주세요');
-    }
-    if (password.length < 6) {
-      return Alert.alert('알림', '비밀번호는 6자 이상이어야 합니다');
-    }
+    const nick = nickname.trim();
+    if (!EMAIL_RE.test(email.trim())) return Alert.alert('알림', '이메일 형식을 확인해주세요');
+    if (password.length < 8) return Alert.alert('알림', '비밀번호는 8자 이상이어야 해요');
+    if (nick.length < 2 || nick.length > 12) return Alert.alert('알림', '닉네임은 2~12자로 입력해주세요');
+
     setLoading(true);
     try {
-      await api.register(email, password, nickname);
-      Alert.alert('가입 완료', '회원가입이 완료되었습니다. 로그인해주세요.');
-      navigation.goBack();
+      const data = await api.register(email.trim(), password, nick, avatarId ?? undefined);
+      await saveMemberSession(data.token, data.user);
+      onLogin(); // 가입 후 바로 입장
     } catch (err) {
       Alert.alert('가입 실패', err.message);
     } finally {
@@ -28,30 +43,55 @@ export default function RegisterScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>회원가입</Text>
 
-      <TextInput style={styles.input} placeholder="닉네임" value={nickname} onChangeText={setNickname} />
-      <TextInput style={styles.input} placeholder="이메일" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-      <TextInput style={styles.input} placeholder="비밀번호 (6자 이상)" value={password} onChangeText={setPassword} secureTextEntry />
+      {avatars.length > 0 && (
+        <>
+          <Text style={styles.label}>나의 캐릭터</Text>
+          <View style={styles.avatarRow}>
+            {avatars.map((a) => (
+              <TouchableOpacity
+                key={a.id}
+                onPress={() => setAvatarId(a.id)}
+                style={[styles.avatar, avatarId === a.id && { borderColor: a.color, backgroundColor: colors.surface }]}
+                accessibilityRole="button"
+                accessibilityLabel={`${a.name} 캐릭터`}
+                accessibilityState={{ selected: avatarId === a.id }}
+              >
+                <Text style={styles.avatarEmoji}>{a.emoji}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      )}
 
-      <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
-        <Text style={styles.buttonText}>{loading ? '가입 중...' : '가입하기'}</Text>
+      <TextInput style={styles.input} placeholder="닉네임 (2~12자)" value={nickname} onChangeText={setNickname} maxLength={12} />
+      <TextInput style={styles.input} placeholder="이메일" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+      <TextInput style={styles.input} placeholder="비밀번호 (8자 이상)" value={password} onChangeText={setPassword} secureTextEntry />
+
+      <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading} accessibilityRole="button">
+        <Text style={styles.buttonText}>{loading ? '가입 중...' : '가입하고 시작하기'}</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 30, backgroundColor: '#F8F9FA', justifyContent: 'center' },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#333', marginBottom: 30, textAlign: 'center' },
+  container: { flexGrow: 1, padding: spacing.xl, backgroundColor: colors.background, justifyContent: 'center' },
+  title: { ...typography.title, fontSize: 28, color: colors.text, marginBottom: spacing.lg, textAlign: 'center' },
+  label: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm },
+  avatarRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: spacing.md },
+  avatar: {
+    width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center',
+    marginRight: spacing.sm, marginBottom: spacing.sm, borderWidth: 2, borderColor: 'transparent',
+    backgroundColor: colors.border,
+  },
+  avatarEmoji: { fontSize: 26 },
   input: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 16, fontSize: 16,
-    marginBottom: 12, borderWidth: 1, borderColor: '#E0E0E0',
+    backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, fontSize: 16,
+    marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border,
   },
-  button: {
-    backgroundColor: '#6C5CE7', borderRadius: 12, padding: 16,
-    alignItems: 'center', marginTop: 8,
-  },
-  buttonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  button: { backgroundColor: colors.primary, borderRadius: radius.md, padding: spacing.md, alignItems: 'center', marginTop: spacing.sm },
+  buttonText: { color: colors.onPrimary, fontSize: 18, fontWeight: 'bold' },
 });

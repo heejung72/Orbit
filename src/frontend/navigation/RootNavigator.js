@@ -26,7 +26,9 @@ export default function RootNavigator({ isLoggedIn, isGuest, onLogin, onGuestLog
           <Stack.Screen name="GuestEntry" options={{ headerShown: false }}>
             {props => <GuestEntryScreen {...props} onStart={onGuestLogin} />}
           </Stack.Screen>
-          <Stack.Screen name="Register" component={RegisterScreen} options={{ title: '회원가입' }} />
+          <Stack.Screen name="Register" options={{ title: '회원가입' }}>
+            {props => <RegisterScreen {...props} onLogin={onLogin} />}
+          </Stack.Screen>
         </>
       ) : (
         <>

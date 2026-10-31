@@ -3,7 +3,7 @@ import { secureStorage, clearSession } from './storage';
 
 const API_URL = config.API_URL;
 
-// Guest 시간이 끝났을 때 App이 로그인 화면으로 돌아가도록 등록하는 콜백
+// Guest 시간이 끝났거나 회원 토큰이 만료됐을 때 App이 로그인 화면으로 돌아가도록 등록하는 콜백
 let onSessionExpired = null;
 export const setOnSessionExpired = (fn) => { onSessionExpired = fn; };
 
@@ -21,7 +21,8 @@ async function request(path, options = {}) {
   });
   const data = await res.json();
   if (!res.ok) {
-    if (data.code === 'GUEST_EXPIRED') {
+    // 로그인 실패(코드 없음)와 구분: 미들웨어가 준 UNAUTHORIZED이고 회원 토큰을 보냈을 때만
+    if (data.code === 'GUEST_EXPIRED' || (res.status === 401 && data.code === 'UNAUTHORIZED' && token)) {
       await clearSession();
       onSessionExpired?.();
     }
@@ -36,8 +37,9 @@ export const api = {
   // 인증
   login: (email, password) =>
     request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
-  register: (email, password, nickname) =>
-    request('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, nickname }) }),
+  register: (email, password, nickname, avatar_id) =>
+    request('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, nickname, avatar_id }) }),
+  getAvatars: () => request('/public/avatars'),
   me: () => request('/auth/me'),
 
   // Guest (30분 둘러보기)

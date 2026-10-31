@@ -21,8 +21,8 @@
 ## Auth — #4, #14
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
-| POST | `/auth/register` | - (선택: `X-Guest-Token`) | 회원가입. Guest 토큰이 있으면 데이터 이전 (#14) |
-| POST | `/auth/login` | - | 로그인 → JWT |
+| POST | `/auth/register` | - (선택: `X-Guest-Token`) | `{email, password(8자~72바이트), nickname(2~12자), avatar_id?}` → `201 {token, user:{nickname, avatar_id}}`. 이메일은 소문자 저장, 중복 409, 없는 캐릭터 400. Guest 데이터 이전은 #14 |
+| POST | `/auth/login` | - | `{email, password}` → `{token, user}` (이메일 대소문자 무시), 실패 401, 정지 403 |
 | GET | `/auth/me` | O | `{type: 'member' \| 'guest', nickname, avatar_id, avatar_emoji, expires_at?}` |
 
 ## Guest — #5
@@ -36,7 +36,7 @@
 |---|---|---|---|
 | PATCH | `/users/me` | M | 닉네임, 캐릭터 변경 |
 | DELETE | `/users/me` | M | 탈퇴 |
-| GET | `/avatars` | - | 기본 캐릭터 목록 |
+| GET | `/public/avatars` | - | 기본 캐릭터 목록 `[{id, name, emoji, color}]` |
 
 ## Tastes — #7
 | Method | Path | 인증 | 설명 |

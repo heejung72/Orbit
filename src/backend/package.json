@@ -11,7 +11,8 @@
     "db:reset": "node migrations/reset.js",
     "seed": "node seeds/run.js",
     "db:setup": "npm run db:reset && npm run migrate && npm run seed",
-    "test:guest": "node tests/guest.e2e.js"
+    "test:guest": "node tests/guest.e2e.js",
+    "test:auth": "node tests/auth.e2e.js"
   },
   "dependencies": {
     "express": "^4.18.2",

@@ -23,6 +23,14 @@ export const secureStorage = {
   remove: (key) => orNull(async () => (isWeb ? localStorage.removeItem(key) : SecureStore.deleteItemAsync(key))),
 };
 
+// 회원 로그인·가입 성공 시: 회원 토큰 저장 + 남아 있던 Guest 흔적 정리
+export async function saveMemberSession(token, user) {
+  await secureStorage.set('token', token);
+  await secureStorage.remove('guestToken');
+  await AsyncStorage.multiSet([['user', JSON.stringify(user)], ['isGuest', 'false']]);
+  await AsyncStorage.removeItem('guestExpiresAt');
+}
+
 // 로그아웃·Guest 만료 시 세션 흔적을 모두 지움
 export async function clearSession() {
   await Promise.all([secureStorage.remove('token'), secureStorage.remove('guestToken')]);

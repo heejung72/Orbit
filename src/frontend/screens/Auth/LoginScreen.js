@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../../services/api';
-import { secureStorage } from '../../services/storage';
+import { secureStorage, saveMemberSession } from '../../services/storage';
 
 export default function LoginScreen({ navigation, onLogin }) {
   const [email, setEmail] = useState('');
@@ -14,8 +14,7 @@ export default function LoginScreen({ navigation, onLogin }) {
     setLoading(true);
     try {
       const data = await api.login(email, password);
-      await secureStorage.set('token', data.token);
-      await AsyncStorage.multiSet([['user', JSON.stringify(data.user)], ['isGuest', 'false']]);
+      await saveMemberSession(data.token, data.user);
       onLogin();
     } catch (err) {
       Alert.alert('로그인 실패', err.message);
