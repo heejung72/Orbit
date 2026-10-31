@@ -1,5 +1,30 @@
-// 토큰 저장소 래퍼
-// - iOS·Android: Expo SecureStore
-// - Web: HttpOnly 쿠키 vs localStorage — #5에서 결정 (docs/progress.md 미결정 사항)
-// 구현: #4, #5. 지금은 api.js / socket.js가 AsyncStorage를 직접 사용합니다.
-export {};
+import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// 토큰(회원 JWT, Guest 토큰)은 iOS·Android에서 SecureStore에 저장
+// shortcut: 웹은 localStorage(XSS에 노출), 웹 회원 로그인을 정식 지원할 때 HttpOnly 쿠키로 전환
+const isWeb = Platform.OS === 'web';
+
+// 읽기·삭제 실패(웹 저장소 차단, 키체인 오류)는 경고 후 null — 앱 전체가 멈추지 않게.
+// 쓰기 실패는 호출한 화면이 알 수 있도록 그대로 던진다.
+const orNull = async (fn) => {
+  try {
+    return await fn();
+  } catch (err) {
+    console.warn('저장소 접근 실패:', err.message);
+    return null;
+  }
+};
+
+export const secureStorage = {
+  get: (key) => orNull(async () => (isWeb ? localStorage.getItem(key) : SecureStore.getItemAsync(key))),
+  set: async (key, value) => (isWeb ? localStorage.setItem(key, value) : SecureStore.setItemAsync(key, value)),
+  remove: (key) => orNull(async () => (isWeb ? localStorage.removeItem(key) : SecureStore.deleteItemAsync(key))),
+};
+
+// 로그아웃·Guest 만료 시 세션 흔적을 모두 지움
+export async function clearSession() {
+  await Promise.all([secureStorage.remove('token'), secureStorage.remove('guestToken')]);
+  await AsyncStorage.multiRemove(['user', 'isGuest', 'guestExpiresAt']);
+}

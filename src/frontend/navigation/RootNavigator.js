@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import LoginScreen from '../screens/Auth/LoginScreen';
 import RegisterScreen from '../screens/Auth/RegisterScreen';
+import GuestEntryScreen from '../screens/GuestEntry/GuestEntryScreen';
 import TasteSelectScreen from '../screens/TasteSelect/TasteSelectScreen';
 import ChatRoomScreen from '../screens/Chat/ChatRoomScreen';
 import LoungeChatScreen from '../screens/Lounge/LoungeChatScreen';
@@ -20,7 +21,10 @@ export default function RootNavigator({ isLoggedIn, isGuest, onLogin, onGuestLog
       {!isLoggedIn ? (
         <>
           <Stack.Screen name="Login" options={{ headerShown: false }}>
-            {props => <LoginScreen {...props} onLogin={onLogin} onGuestLogin={onGuestLogin} />}
+            {props => <LoginScreen {...props} onLogin={onLogin} />}
+          </Stack.Screen>
+          <Stack.Screen name="GuestEntry" options={{ headerShown: false }}>
+            {props => <GuestEntryScreen {...props} onStart={onGuestLogin} />}
           </Stack.Screen>
           <Stack.Screen name="Register" component={RegisterScreen} options={{ title: '회원가입' }} />
         </>

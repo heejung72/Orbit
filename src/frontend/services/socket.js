@@ -1,14 +1,14 @@
 import { io } from 'socket.io-client';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import config from '../config';
+import { secureStorage } from './storage';
 
 const SOCKET_URL = config.SOCKET_URL;
 
 let socket = null;
 
 export async function connectSocket() {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) return null;
+  const token = await secureStorage.get('token');
+  if (!token) return null; // Guest 소켓은 #10
 
   socket = io(SOCKET_URL, {
     auth: { token },

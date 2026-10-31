@@ -16,6 +16,7 @@ const questionRoutes = require('./routes/questions');
 const { setupSocket } = require('./socket');
 const optionalAuth = require('./middleware/optionalAuth');
 const memberAuth = require('./middleware/memberAuth');
+const { connectRedis } = require('./redis');
 
 const app = express();
 const server = http.createServer(app);
@@ -31,15 +32,15 @@ app.use('/api/auth', authRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/guest', guestRoutes); // #5
 
-// Protected routes (로그인 + 게스트 모두 접근 가능)
-app.use('/api/users', optionalAuth, userRoutes);
+// 회원 + Guest (Guest 요청엔 req.userId가 없음 → 라우트에서 req.isGuest로 분기)
 app.use('/api/tastes', optionalAuth, tasteRoutes);
-app.use('/api/chat', optionalAuth, chatRoutes);
-app.use('/api/lounges', optionalAuth, loungeRoutes);
+app.use('/api/lounges', optionalAuth, loungeRoutes); // Guest: 읽기만, 참여는 #11
 app.use('/api/questions', optionalAuth, questionRoutes); // #15
 
-// Members only (회원 전용 - 게스트 차단)
-// TODO(#13, #16): PRD상 Guest도 매칭·신고 가능 → optionalAuth로 전환
+// 회원 전용 — 각 기능 이슈에서 Guest 지원 시 optionalAuth로 전환
+// users·취향 저장 #7, chat #10, matching #13, reports #16
+app.use('/api/users', memberAuth, userRoutes);
+app.use('/api/chat', memberAuth, chatRoutes);
 app.use('/api/matching', memberAuth, matchingRoutes);
 app.use('/api/reports', memberAuth, reportRoutes);
 
@@ -50,5 +51,10 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Orbit server running on port ${PORT}`);
 });
+
+// Redis가 없으면 Guest 기능만 503, 회원 기능은 계속 동작
+connectRedis()
+  .then(() => console.log('Redis connected'))
+  .catch((err) => console.error('Redis 연결 실패 — Guest 기능 사용 불가:', err.message));
 
 module.exports = { app, server };

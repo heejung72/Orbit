@@ -17,6 +17,7 @@ Orbit은 취향 기반 익명 소셜 채팅·커뮤니티 앱이다. **1인 개�
 - PR: `gh pr create --base main --title "[TYPE] #번호 이슈 제목" --body-file <파일>`
   - 본문은 `.github/pull_request_template.md` 양식, 반드시 `Closes #번호`
 - **머지는 하지 않는다.** 사용자가 CodeRabbit 리뷰 확인 후 직접 Squash and merge 한다.
+- 머지 안내 시: CodeRabbit 체크가 ✅가 될 때까지 기다리라고 알린다 (push 직후 머지하면 리뷰 취소 → ❌). 리뷰 반영 커밋은 모아서 한 번에 push (무료 플랜 시간당 10회).
 - CodeRabbit 리뷰를 반영해 달라고 하면 `gh pr view <번호> --comments`로 확인 후 수정 커밋을 push 한다. 커밋 타입은 이슈 타입과 상관없이 **`[FIX] #번호 CodeRabbit 리뷰 반영`**. 오탐은 수정하지 말고 답글 문구를 사용자에게 제안한다.
 - `main`에 직접 commit/push 하지 않는다. `git push --force`, `git reset --hard`는 사용자 확인 없이 쓰지 않는다.
 
@@ -63,9 +64,10 @@ push·PR 전에 **ponytail-review** 기준으로 이번 변경(`git diff main...
 - 인증은 `memberAuth` / `guestAuth` / `optionalAuth` + `req.actor = {type, id}`로 통일.
 - 클라이언트에는 실제 user_id·이메일을 노출하지 않는다. 채팅에서는 `display_name`, `avatar_id`만.
 - SQL은 파라미터 바인딩만. 비밀값은 `.env`에서만. `.env`는 커밋 금지.
-- 토큰은 iOS·Android에서 Expo SecureStore에 저장. Web 저장 방식은 #5에서 결정(`Platform.OS` 분기). 색상·폰트는 `theme/` 토큰 사용.
+- 토큰은 `services/storage.js`로만 저장: iOS·Android는 Expo SecureStore, Web은 localStorage(`Platform.OS` 분기). 웹 회원 로그인을 정식 지원할 때 HttpOnly 쿠키 전환 검토. 색상·폰트는 `theme/` 토큰 사용.
 
 ## 실행
 - backend: `cd src/backend && npm run dev` (PostgreSQL·Redis: `docker compose up -d postgres redis`)
 - frontend: `cd src/frontend && npx expo start`
+- 테스트: `cd src/backend && npm run test:guest` (서버·Redis 실행 중이어야 함)
 - 작업 후 최소한 서버/앱이 에러 없이 뜨는지 확인하고 PR 본문 "동작 확인"에 적는다.

@@ -3,7 +3,8 @@
 > 상태: **엔드포인트 목록 초안.** 요청/응답 상세는 각 이슈 작업 시 채운다.
 > - Base URL: `/api`
 > - 인증: `M` = memberAuth, `G` = guestAuth, `O` = optionalAuth(회원·Guest), `-` = 없음
-> - 에러 형식: `{ "error": { "code": "GUEST_EXPIRED", "message": "..." } }`
+> - 에러 형식: `{ "error": "사용자에게 보여줄 메시지", "code": "GUEST_EXPIRED" }` (`code`는 클라이언트가 분기해야 할 때만)
+> - Guest 인증 헤더: `X-Guest-Token: <guestToken>` (회원은 `Authorization: Bearer <JWT>`, 둘 다 있으면 회원 우선)
 > - ⚠️ #3 시점 실제 구현은 이전 경로를 유지합니다 (`PUT /users/me/tastes` body `{ tags: [{tagId, weight}] }`, `POST /matching/find`, `POST /matching/request/:targetId` 등). 각 기능 이슈에서 아래 명세로 교체합니다.
 
 ## 공통 에러 코드
@@ -11,7 +12,8 @@
 |---|---|---|
 | `UNAUTHORIZED` | 401 | 토큰 없음/무효 |
 | `GUEST_EXPIRED` | 401 | Guest 세션 만료 |
-| `FORBIDDEN` | 403 | 권한 없음 (예: Guest 불가 기능) |
+| `MEMBER_ONLY` | 403 | 회원 전용 기능에 Guest 토큰으로 접근 |
+| `UNAVAILABLE` | 503 | Redis 미연결 (Guest 기능) |
 | `BLOCKED_USER` | 403 | 차단 관계 |
 | `RATE_LIMITED` | 429 | 요청 과다 |
 | `VALIDATION_ERROR` | 400 | 입력값 오류 |
@@ -21,12 +23,12 @@
 |---|---|---|---|
 | POST | `/auth/register` | - (선택: `X-Guest-Token`) | 회원가입. Guest 토큰이 있으면 데이터 이전 (#14) |
 | POST | `/auth/login` | - | 로그인 → JWT |
-| GET | `/auth/me` | O | 현재 actor 정보 (Guest면 expiresAt 포함) |
+| GET | `/auth/me` | O | `{type: 'member' \| 'guest', nickname, avatar_id, avatar_emoji, expires_at?}` |
 
 ## Guest — #5
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
-| POST | `/guest/session` | - | Guest 발급 → `{guestToken, guestId, nickname, avatarId, expiresAt}` |
+| POST | `/guest/session` | - | Guest 발급 → `201 {guestToken, nickname, avatarId, avatarEmoji, expiresAt(ISO)}` (guestId는 내려주지 않음) |
 | DELETE | `/guest/session` | G | 직접 종료 |
 
 ## Users / My Orbit — #17

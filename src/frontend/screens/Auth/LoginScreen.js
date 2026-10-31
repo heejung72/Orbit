@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../../services/api';
+import { secureStorage } from '../../services/storage';
 
-export default function LoginScreen({ navigation, onLogin, onGuestLogin }) {
+export default function LoginScreen({ navigation, onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -13,9 +14,8 @@ export default function LoginScreen({ navigation, onLogin, onGuestLogin }) {
     setLoading(true);
     try {
       const data = await api.login(email, password);
-      await AsyncStorage.setItem('token', data.token);
-      await AsyncStorage.setItem('user', JSON.stringify(data.user));
-      await AsyncStorage.setItem('isGuest', 'false');
+      await secureStorage.set('token', data.token);
+      await AsyncStorage.multiSet([['user', JSON.stringify(data.user)], ['isGuest', 'false']]);
       onLogin();
     } catch (err) {
       Alert.alert('로그인 실패', err.message);
@@ -27,11 +27,14 @@ export default function LoginScreen({ navigation, onLogin, onGuestLogin }) {
   const handleGuestLogin = async () => {
     setLoading(true);
     try {
-      const data = await api.guestLogin();
-      await AsyncStorage.setItem('token', data.token);
-      await AsyncStorage.setItem('user', JSON.stringify(data.user));
-      await AsyncStorage.setItem('isGuest', 'true');
-      onGuestLogin();
+      const data = await api.createGuestSession();
+      await secureStorage.set('guestToken', data.guestToken);
+      await AsyncStorage.multiSet([
+        ['user', JSON.stringify({ nickname: data.nickname, avatar_id: data.avatarId })],
+        ['isGuest', 'true'],
+        ['guestExpiresAt', data.expiresAt],
+      ]);
+      navigation.navigate('GuestEntry', { nickname: data.nickname, avatarEmoji: data.avatarEmoji, expiresAt: data.expiresAt });
     } catch (err) {
       Alert.alert('오류', err.message);
     } finally {
@@ -66,7 +69,7 @@ export default function LoginScreen({ navigation, onLogin, onGuestLogin }) {
 
       <TouchableOpacity style={styles.guestButton} onPress={handleGuestLogin} disabled={loading}>
         <Text style={styles.guestButtonText}>둘러보기</Text>
-        <Text style={styles.guestSubtext}>로그인 없이 구경하기</Text>
+        <Text style={styles.guestSubtext}>가입 없이 30분 동안 머물기</Text>
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation.navigate('Register')}>
