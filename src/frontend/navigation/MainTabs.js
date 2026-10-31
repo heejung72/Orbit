@@ -12,7 +12,7 @@ const Tab = createBottomTabNavigator();
 
 // 하단 탭: Home / Lounge / Chat / My Orbit
 // 아이콘·스타일 정리는 #9(하단 탭 네비게이션)에서 진행합니다.
-export default function MainTabs({ isGuest }) {
+export default function MainTabs({ isGuest, onLogout }) {
   return (
     <Tab.Navigator
       screenOptions={{
@@ -39,9 +39,10 @@ export default function MainTabs({ isGuest }) {
       {!isGuest ? (
         <Tab.Screen
           name="MyOrbit"
-          component={MyOrbitScreen}
           options={{ title: 'My Orbit', tabBarIcon: () => <Text>👤</Text> }}
-        />
+        >
+          {props => <MyOrbitScreen {...props} onLogout={onLogout} />}
+        </Tab.Screen>
       ) : null}
     </Tab.Navigator>
   );

@@ -71,7 +71,9 @@ router.get('/lounges', async (req, res) => {
 router.get('/lounges/:id', async (req, res) => {
   try {
     const club = await db.query(
-      `SELECT c.*, tc.name as category_name, u.nickname as owner_nickname,
+      // 공개 API: 실제 사용자 ID(owner_id 등)는 반환하지 않음 — docs/prd.md §3-6
+      `SELECT c.id, c.name, c.description, c.category_id, c.max_members, c.created_at,
+        tc.name as category_name, u.nickname as owner_nickname,
         (SELECT COUNT(*) FROM club_members WHERE club_id = c.id) as member_count
        FROM clubs c
        JOIN taste_categories tc ON c.category_id = tc.id
@@ -84,7 +86,7 @@ router.get('/lounges/:id', async (req, res) => {
     }
 
     const members = await db.query(
-      `SELECT u.id, u.nickname, u.profile_image, cm.role, cm.joined_at
+      `SELECT u.nickname, cm.role, cm.joined_at
        FROM club_members cm JOIN users u ON cm.user_id = u.id
        WHERE cm.club_id = $1 ORDER BY cm.joined_at`,
       [req.params.id]

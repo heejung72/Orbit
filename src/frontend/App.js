@@ -31,6 +31,7 @@ export default function App() {
         isGuest={isGuest}
         onLogin={() => setAuthState('member')}
         onGuestLogin={() => setAuthState('guest')}
+        onLogout={() => setAuthState('loggedOut')}
       />
     </NavigationContainer>
   );

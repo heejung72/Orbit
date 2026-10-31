@@ -92,6 +92,7 @@
 - [ ] `guestAuth` 미들웨어, `optionalAuth`에 Guest 지원 추가
 - [ ] `guestAuth`가 **모든 HTTP 요청마다** `expiresAt`을 직접 검사 → 지났으면 `401 GUEST_EXPIRED` (TTL에만 의존 X)
 - [ ] 기존 `routes/auth.js`의 PG 기반 Guest(24h JWT) 제거
+- [ ] `optionalAuth`의 Guest 경로를 Redis 세션 `expiresAt` 직접 검사로 교체 (JWT `exp`로 대체 X) — PR #19 CodeRabbit 지적
 - [ ] 앱: guestToken SecureStore 저장, `AuthContext`에 actor 타입 반영
 - [ ] GuestEntry 화면 (발급된 닉네임·캐릭터, "30분 동안 머물 수 있어요" 안내)
 
@@ -132,6 +133,7 @@
 ## #11 [FEAT] 취향 라운지
 - [ ] `GET /lounges`, `/lounges/recommended`, `/lounges/:id`, `/lounges/:id/messages`
 - [ ] 실시간 인원 `room:presence`
+- [ ] Guest 라운지 참여는 Redis(TTL)로만 관리, `lounge_members`(PG)에는 회원만 기록 — PR #19 CodeRabbit 지적
 - [ ] LoungeList (카테고리 필터, 인기순), LoungeChat (그룹 채팅)
 - [ ] Home의 Active Lounges 연결
 

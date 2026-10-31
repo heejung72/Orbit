@@ -12,7 +12,7 @@ import { colors } from '../theme';
 const Stack = createNativeStackNavigator();
 
 // 진입 분기(Welcome / Guest / Member)는 #6에서 Welcome 화면과 함께 정리합니다.
-export default function RootNavigator({ isLoggedIn, isGuest, onLogin, onGuestLogin }) {
+export default function RootNavigator({ isLoggedIn, isGuest, onLogin, onGuestLogin, onLogout }) {
   return (
     <Stack.Navigator
       screenOptions={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: colors.onPrimary }}
@@ -27,7 +27,7 @@ export default function RootNavigator({ isLoggedIn, isGuest, onLogin, onGuestLog
       ) : (
         <>
           <Stack.Screen name="Main" options={{ headerShown: false }}>
-            {() => <MainTabs isGuest={isGuest} />}
+            {() => <MainTabs isGuest={isGuest} onLogout={onLogout} />}
           </Stack.Screen>
           <Stack.Screen name="TasteSelect" component={TasteSelectScreen} options={{ title: '취향 선택' }} />
           <Stack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ title: '채팅' }} />
