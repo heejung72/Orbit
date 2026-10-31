@@ -14,9 +14,8 @@ const LIST_SELECT = `
 async function listLounges({ categoryId, search, limit } = {}) {
   const params = [];
   let where = 'WHERE 1=1';
-  const category = Number.parseInt(categoryId, 10);
-  if (Number.isInteger(category) && category > 0) {
-    params.push(category);
+  if (categoryId) {
+    params.push(categoryId);
     where += ` AND l.category_id = $${params.length}`;
   }
   if (search) {

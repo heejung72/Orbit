@@ -7,6 +7,7 @@ import { useNavigation } from '@react-navigation/native';
 import { api } from '../../services/api';
 import VennDiagram from '../../_legacy/components/VennDiagram';
 import RadarChart from '../../_legacy/components/RadarChart';
+import { colors } from '../../theme';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.75;
@@ -73,7 +74,7 @@ export default function HomeScreen({ isGuest }) {
         </View>
         <View style={styles.matchCardInfo}>
           <Text style={styles.matchNickname}>{item.nickname}</Text>
-          <Text style={styles.matchBio} numberOfLines={2}>{item.common_tags?.length ? `공통 취향: ${item.common_tags.join(' · ')}` : ''}</Text>
+          <Text style={styles.matchBio} numberOfLines={2}>{item.common_tags?.length ? `공통 취향: ${item.common_tags.slice(0, 3).join(' · ')}` : ''}</Text>
         </View>
       </View>
       <View style={styles.matchScoreRow}>
@@ -297,7 +298,7 @@ const styles = StyleSheet.create({
     width: 130, height: 160, borderRadius: 14, marginHorizontal: 6, overflow: 'hidden',
   },
   tasteImage: { width: '100%', height: '100%' },
-  tastePlaceholder: { backgroundColor: '#6C5CE7' }, // 이미지 없는 태그 (#8에서 디자인 토큰으로 교체)
+  tastePlaceholder: { backgroundColor: colors.primary }, // 이미지 없는 태그
   tasteOverlay: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: 'rgba(0,0,0,0.45)', paddingVertical: 8, paddingHorizontal: 10,

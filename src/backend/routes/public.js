@@ -1,5 +1,6 @@
 const express = require('express');
 const { listLounges, getLounge } = require('../services/lounges');
+const { toId } = require('../utils/validate');
 const { getCategoriesWithTags } = require('./tastes');
 
 const router = express.Router();
@@ -22,7 +23,9 @@ router.get('/home', async (req, res) => {
 router.get('/lounges', async (req, res) => {
   try {
     const { category_id, search } = req.query;
-    res.json(await listLounges({ categoryId: category_id, search }));
+    const categoryId = category_id === undefined ? null : toId(category_id);
+    if (category_id !== undefined && !categoryId) return res.status(400).json({ error: 'category_id가 올바르지 않습니다' });
+    res.json(await listLounges({ categoryId, search: typeof search === 'string' ? search : undefined }));
   } catch (err) {
     res.status(500).json({ error: '서버 오류가 발생했습니다' });
   }

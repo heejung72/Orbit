@@ -133,6 +133,9 @@ npm run db:reset      # public 스키마 삭제 후 재생성 (NODE_ENV=producti
 ```
 
 - 새 스키마 변경은 `002_xxx.sql`처럼 **새 파일을 추가**한다. 이미 적용된 파일은 수정하지 않는다.
+- #3 이전(TasteMate) 스키마 DB에서는 `migrate`가 안내 메시지와 함께 중단된다 → `npm run db:setup`으로 초기화.
+  출시 전이라 데이터 변환 마이그레이션은 만들지 않았다. **운영 DB가 생긴 뒤의 변경은 반드시 데이터를 보존하는 새 마이그레이션 파일로** 작성한다.
+- `db:reset`은 `NODE_ENV=production`이거나 DB 주소가 로컬이 아니면 거부된다 (원격 DB는 `ALLOW_DB_RESET=1` 필요).
 - 시드 데이터 원본: [`src/backend/seeds/data.js`](../src/backend/seeds/data.js)
   - 캐릭터 6 · 카테고리 7 · 태그 62 · 라운지 7(+라운지 채팅방 7) · 오늘의 질문 30
 

@@ -29,7 +29,7 @@ router.post('/find', async (req, res) => {
       return {
         ...user,
         similarity_score: Math.round(m.score * 100),
-        common_tags: m.commonTagIds.slice(0, 3).map((id) => tagName.get(id)),
+        common_tags: m.commonTagIds.map((id) => tagName.get(id)),
       };
     });
     res.json({ matches: result });

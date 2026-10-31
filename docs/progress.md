@@ -41,6 +41,8 @@
 | 2026-10-31 | 메시지 응답은 `sender_id` 대신 **`is_mine`** | PR #20 CodeRabbit, 익명성 |
 | 2026-10-31 | 라우트 입구에서 UUID·숫자·날짜 검증(`utils/validate.js`), 잘못된 값은 400/404 | PR #20 CodeRabbit |
 | 2026-10-31 | 매칭 요청·수락 시 차단 관계 양방향 재확인, 차단 후 수락은 `cancelled` | PR #20 CodeRabbit |
+| 2026-10-31 | 이전 스키마 → 새 스키마 변환 마이그레이션은 만들지 않음 (출시 전, 운영 데이터 없음). 이전 스키마 감지 시 `migrate` 중단 | PR #20 CodeRabbit. 운영 이후엔 보존형 마이그레이션 필수 |
+| 2026-10-31 | 로그인·가입 응답 `user`에서 id·email 제거 (nickname, avatar_id만) | PR #20 CodeRabbit, 익명성 |
 | 2026-10-31 | CodeRabbit 리뷰 반영 커밋은 항상 **`[FIX]`** | 이슈 타입과 무관 |
 | 2026-10-31 | 이슈·커밋·PR 제목은 **`[TYPE]` 대문자 대괄호** 형식 | 예: `[FEAT] #5 Guest 세션 발급 API 추가`. 브랜치만 소문자 |
 

@@ -17,6 +17,15 @@ async function runMigrations() {
       )
     `);
 
+    // #3 이전(TasteMate) 스키마가 남아 있으면 001을 다시 만들다 실패하므로 안내 후 중단
+    // shortcut: 출시 전이라 데이터 변환 마이그레이션 없이 초기화로 대응, 운영 DB가 생기면 변환 파일 추가
+    const legacy = await client.query(
+      `SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'taste_options'`
+    );
+    if (legacy.rows.length > 0) {
+      throw new Error('이전(TasteMate) 스키마가 있는 DB입니다. 개발 DB라면 `npm run db:setup`으로 초기화하세요.');
+    }
+
     const applied = new Set(
       (await client.query('SELECT filename FROM schema_migrations')).rows.map((r) => r.filename)
     );

@@ -8,7 +8,8 @@ const router = express.Router();
 const signToken = (userId) =>
   jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
 
-const publicUser = (u) => ({ id: u.id, email: u.email, nickname: u.nickname, avatar_id: u.avatar_id });
+// 실제 user_id·이메일은 응답에 넣지 않음 (docs/prd.md §3-6)
+const publicUser = (u) => ({ nickname: u.nickname, avatar_id: u.avatar_id });
 
 // 회원가입
 // TODO(#4): 입력 검증 강화(이메일 형식, 비밀번호 8자, 닉네임 2~12자), avatarId 선택

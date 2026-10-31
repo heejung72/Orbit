@@ -15,11 +15,30 @@ function toPositiveInt(value, fallback, max) {
   return max ? Math.min(n, max) : n;
 }
 
+// 문자열 전체가 양의 정수일 때만 숫자로 ("1abc" → null)
+function toId(value) {
+  return typeof value === 'string' && /^[1-9]\d{0,9}$/.test(value) ? Number(value) : null;
+}
+
 // 유효한 날짜 문자열이면 ISO 문자열, 아니면 null
+// Date는 2019-02-30을 03-02로 자동 보정하므로 연·월·일이 그대로인지 다시 확인
 function toIsoDate(value) {
   if (typeof value !== 'string') return null;
   const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  if (Number.isNaN(d.getTime())) return null;
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (ymd) {
+    const check = new Date(Date.UTC(+ymd[1], +ymd[2] - 1, +ymd[3]));
+    if (check.getUTCMonth() !== +ymd[2] - 1 || check.getUTCDate() !== +ymd[3]) return null;
+  }
+  return d.toISOString();
 }
 
-module.exports = { toUuid, toPositiveInt, toIsoDate };
+module.exports = { toUuid, toPositiveInt, toId, toIsoDate };
+
+// self-check
+const assert = require('assert');
+assert.strictEqual(toIsoDate('2019-02-30'), null);
+assert.strictEqual(toIsoDate('2024-02-29T00:00:00Z'), '2024-02-29T00:00:00.000Z');
+assert.strictEqual(toId('1abc'), null);
+assert.strictEqual(toId('12'), 12);

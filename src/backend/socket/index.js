@@ -16,6 +16,7 @@ function setupSocket(io) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       if (decoded.isGuest) return next(new Error('Guest 연결은 준비 중입니다'));
       socket.userId = decoded.userId;
+      socket.data.userId = decoded.userId; // fetchSockets()에서 읽기 위해
       next();
     } catch {
       next(new Error('유효하지 않은 토큰입니다'));
@@ -72,8 +73,10 @@ function setupSocket(io) {
           content: filtered,
           created_at: rows[0].created_at,
         };
-        socket.emit('new_message', { ...message, is_mine: true });
-        socket.to(room.id).emit('new_message', { ...message, is_mine: false });
+        // 같은 회원의 다른 기기에서도 내 메시지로 보이도록 소켓마다 비교
+        for (const s of await io.in(room.id).fetchSockets()) {
+          s.emit('new_message', { ...message, is_mine: s.data.userId === socket.userId });
+        }
       } catch {
         socket.emit('error', { message: '메시지 전송에 실패했습니다' });
       }
