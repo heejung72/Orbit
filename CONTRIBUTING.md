@@ -109,6 +109,11 @@ gh pr create --base main --title "[FEAT] #5 Guest 세션" --body-file /tmp/pr-bo
 
 > 브랜치명만 소문자 `type/` 형식을 씁니다. git 브랜치 이름에 대괄호를 쓰면 터미널에서 따옴표가 필요해 불편하기 때문입니다.
 
+## 4-2-1. PR 올리기 전 셀프 리뷰 (필수)
+push·PR 전에 **ponytail-review** 기준으로 변경분을 먼저 리뷰하고, Must fix·Should fix를 고친 뒤 올립니다.
+반복해서 나온 지적 목록은 [CLAUDE.md](CLAUDE.md) "PR 올리기 전 셀프 리뷰"에 있습니다.
+PR 본문 "메모"에 결과를 한 줄로 남깁니다. (예: `셀프 리뷰: Must 0 / Should 2(반영) / 남긴 것: Rate Limit → #16`)
+
 ## 4-3. 머지 전 셀프 리뷰 순서
 1. PR의 **Files changed** 탭에서 변경 파일을 한 번 훑기
 2. CodeRabbit 리뷰 확인 → 반영 또는 resolve

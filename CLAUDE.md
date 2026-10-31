@@ -24,6 +24,19 @@ Orbit은 취향 기반 익명 소셜 채팅·커뮤니티 앱이다. **1인 개�
 - 직전 이슈가 머지됐다면 첫 커밋으로 `docs/progress.md`·`docs/tasks.md`에 완료 반영 (✅, 완료 표에 PR 번호·머지일, "지금 상태"를 새 이슈로) — 커밋 `[DOCS] #번호 progress.md 갱신 (#이전 완료 반영)`
 - PR은 `--body` 대신 템플릿을 채운 파일로 `--body-file` 사용
 
+## PR 올리기 전 셀프 리뷰 (필수)
+push·PR 전에 **ponytail-review** 기준으로 이번 변경(`git diff main...HEAD` + 작업 중 변경)을 직접 리뷰하고, Must fix·Should fix는 고친 뒤 올린다.
+- 순서: 정확성 → 보안·데이터 → 동시 사용 → 테스트 → 속도 → 군더더기(lean)
+- 이 프로젝트에서 반복된 지적은 꼭 확인:
+  - 라우트 입구 입력 검증: UUID(`toUuid`), 숫자(`toId`/`toPositiveInt`), 날짜(`toIsoDate`) → 잘못된 값은 400/404, 500 금지
+  - 응답·소켓 payload에 실제 user_id·email 노출 금지 (`is_mine`, `display_name`만)
+  - 차단 관계 양방향 확인 (매칭 요청·수락, 1:1 방, 라운지 메시지)
+  - 경계값: 빈 값, null 요소, 중복, 음수, 없는 날짜, 대소문자 UUID
+  - 여러 테이블 쓰기는 트랜잭션, FK 위반(23503)은 4xx로
+  - 같은 회원의 여러 기기·소켓
+  - 색상·폰트는 `theme/` 토큰
+- 결과는 PR 본문 "메모"에 한 줄로 요약: `셀프 리뷰: Must 0 / Should n(반영) / 남긴 것: …`
+
 ## 이슈를 마칠 때
 - `docs/tasks.md` 해당 이슈 체크리스트 체크 + 상태 표 갱신(🟨 PR 리뷰)
 - `docs/progress.md`의 "지금 상태", 결정 로그, 미결정 사항 갱신 (같은 PR에 포함)

@@ -17,6 +17,7 @@ Closes #
 - [ ] Guest 메시지 본문을 로그에 남기지 않는다 (채팅 관련 변경 시)
 - [ ] 필요한 문서(prd / system_design / api_spec / database)를 갱신했다
 - [ ] `docs/progress.md`를 갱신했다
+- [ ] PR 올리기 전 ponytail-review로 셀프 리뷰를 했다 (결과는 메모에)
 - [ ] CodeRabbit 리뷰를 확인하고 반영/resolve 했다
 
 ## 메모
