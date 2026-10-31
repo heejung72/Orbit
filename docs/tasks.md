@@ -10,8 +10,8 @@
 | # | 이슈 | 브랜치 | 선행 | 상태 |
 |---|---|---|---|---|
 | 1 | [DOCS] 프로젝트 재정비 및 Git/브랜치 전략 세팅 | `docs/#1-project-setup` | - | ✅ |
-| 2 | [REFACTOR] 디렉토리 구조 개편 | `refactor/#2-directory-structure` | 1 | 🟨 |
-| 3 | [REFACTOR] 스키마 재설계 | `refactor/#3-db-schema` | 2 | ⬜ |
+| 2 | [REFACTOR] 디렉토리 구조 개편 | `refactor/#2-directory-structure` | 1 | ✅ |
+| 3 | [REFACTOR] 스키마 재설계 | `refactor/#3-db-schema` | 2 | 🟨 |
 | 4 | [FEAT] 회원 인증 | `feat/#4-member-auth` | 3 | ⬜ |
 | 5 | [FEAT] Guest 세션 | `feat/#5-guest-session` | 3 | ⬜ |
 | 6 | [FEAT] Welcome 화면 | `feat/#6-welcome` | 4, 5 | ⬜ |
@@ -68,14 +68,37 @@
 > DB 연결이 필요한 실제 서버 실행·앱 화면 이동은 로컬(Mac)에서 확인 필요
 
 ## #3 [REFACTOR] 스키마 재설계
-- [ ] 기존 `001_init.sql`, `002_guest_and_images.sql` 정리 → 새 `001_init.sql`
-- [ ] [database.md](./database.md) 테이블 확정 + ERD(mermaid)
-- [ ] Guest 참조 방식 확정 (`actor_type` + `actor_id` 여부)
-- [ ] seeds: 카테고리 7종, 태그(카테고리당 8~12개), 기본 캐릭터 6종, 라운지 6~8개, 오늘의 질문 30개
-- [ ] `npm run migrate`, `npm run seed` 스크립트
-- [ ] docker-compose에 Redis 포함 확인
+**목표:** Orbit 설계에 맞는 새 스키마 + 시드를 만들고, **기존 라우트 SQL도 새 스키마로 수정**해 앱이 계속 동작하게 한다.
+**결정:** PG에는 회원만 저장(Guest는 Redis), 예외로 `reports`만 `*_guest_id` 컬럼 — [database.md §1](./database.md)
 
-**완료 기준:** 빈 DB에서 migrate + seed가 한 번에 성공한다.
+### 스키마
+- [x] `001_init.sql` 새로 작성, `002_guest_and_images.sql` 제거
+- [x] 16개 테이블: avatars, users, taste_categories, taste_tags, user_tastes(weight 1~3), lounges, lounge_tags, lounge_members, chat_rooms, chat_members, messages, match_history, questions, question_answers, reports, blocks
+- [x] CHECK·UNIQUE·부분 인덱스 (자기 자신 차단·매칭 금지, 같은 두 사람 pending 1개, 메시지 1~1000자 등)
+- [x] [database.md](./database.md) 확정 + ERD(mermaid)
+
+### 마이그레이션·시드
+- [x] `migrations/run.js`: `schema_migrations` 기록 + 파일별 트랜잭션, 적용한 파일은 skip
+- [x] `npm run db:reset` (production 거부), `npm run db:setup` (reset+migrate+seed)
+- [x] `npm run seed` (`seeds/data.js`): 캐릭터 6 · 카테고리 7 · 태그 62 · 라운지 7(+채팅방) · 질문 30, 재실행 안전
+
+### 기존 쿼리 수정 (동작 유지)
+- [x] auth: 새 users 컬럼, `POST /auth/guest`(PG Guest)는 #5 전까지 501
+- [x] users: 프로필(avatar), 취향 `tags: [{tagId, weight}]` 트랜잭션 저장
+- [x] tastes / public / lounges: `taste_tags`, `lounges`·`lounge_members`, 공통 조회 `services/lounges.js`, 응답에서 user_id 제외
+- [x] lounges: 라운지 상세에 `chat_room_id`·`is_member` 추가, 생성은 501(V2), Guest 참여 403(#11에서 Redis)
+- [x] chat: `chat_members` 기반 1:1 목록(익명 display_name), 라운지 목록, **방 접근 권한 확인**(`services/chatAccess.js`)
+- [x] matching: `match_history`, 가중치 코사인 유사도 + 공통 태그, 수락 시 방+`chat_members` 트랜잭션 생성
+- [x] reports: 새 컬럼·사유 목록, 신고·제재를 트랜잭션으로
+- [x] socket: 방 접근 확인 후 join/send, 메시지 1~1000자, 새 `messages` 컬럼
+- [x] frontend: 취향 저장 형식, 라운지 채팅 진입 시 `chat_room_id` 사용(기존 버그), 라운지 멤버 표시, 자기소개(bio) 제거
+
+### 확인
+- [x] 빈 DB에서 `npm run db:setup` 성공, migrate·seed 재실행 안전
+- [x] API 시나리오 37개 + 소켓 시나리오 5개 통과 (가입→취향→라운지 참여→매칭 요청·수락→1:1·라운지 메시지→신고·차단)
+- [x] frontend `npx expo export --platform web` 성공
+
+**완료 기준:** 빈 DB에서 migrate + seed가 한 번에 성공하고, 기존 화면이 새 스키마로 동작한다.
 
 ## #4 [FEAT] 회원 인증
 - [ ] `POST /auth/register` (email, password, nickname, avatarId) — bcrypt
@@ -149,7 +172,7 @@
 - [ ] `services/matching` 가중치 코사인 유사도 + 제외 규칙 ([system_design.md §6](./system_design.md)) — 후보는 온라인 actor만
 - [ ] `GET /matching/candidates`, 요청/수락/거절 API + `match:request`/`match:accepted` 이벤트
 - [ ] Matching 화면 (상대 캐릭터, 닉네임, 공통 취향 3개, [대화 요청])
-- [ ] 수락 시 1:1 방 생성 (Guest 포함 시 `is_temporary=true`)
+- [ ] 수락 시 1:1 방 생성 (회원끼리는 PG, Guest가 끼면 Redis 임시방)
 - [ ] 대화 주제 추천 `GET /chat/rooms/:id/topics` + ChatRoom 상단 카드
 
 ## #14 [FEAT] Guest → 회원 전환

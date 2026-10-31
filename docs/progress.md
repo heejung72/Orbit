@@ -3,15 +3,16 @@
 > **작업을 다시 시작할 때 이 파일부터 읽는다.** 작업이 끝날 때마다 갱신한다.
 
 ## 🔖 지금 상태
-- **현재 이슈:** #2 [REFACTOR] 디렉토리 구조 개편
-- **브랜치:** `refactor/#2-directory-structure`
+- **현재 이슈:** #3 [REFACTOR] 스키마 재설계
+- **브랜치:** `refactor/#3-db-schema`
 - **상태:** 작업 완료 → PR 리뷰 대기
-- **다음 할 일:** #2 PR 머지 → `refactor/#3-db-schema` 브랜치 생성 → 첫 커밋으로 #2 완료 반영 → [tasks.md #3](./tasks.md#3-refactor-스키마-재설계) 진행
+- **다음 할 일:** #3 PR 머지 → 로컬 DB 초기화(`npm run db:setup`) → `feat/#4-member-auth` 브랜치 생성 → 첫 커밋으로 #3 완료 반영 → [tasks.md #4](./tasks.md#4-feat-회원-인증) 진행
 
 ## ✅ 완료한 이슈
 | # | 제목 | PR | 머지일 |
 |---|---|---|---|
 | 1 | [DOCS] 프로젝트 재정비 및 Git/브랜치 전략 세팅 | #18 | 2026-10-31 |
+| 2 | [REFACTOR] 디렉토리 구조 개편 | #19 | 2026-10-31 |
 
 ## 📌 결정 로그
 | 날짜 | 결정 | 근거/비고 |
@@ -33,22 +34,27 @@
 | 2026-10-31 | 기존 `RadarChart`·`VennDiagram`은 `_legacy/`로 보관 (MVP 디자인에 없음) | #8·#17 재작성 시 제거 |
 | 2026-10-31 | 라운지 직접 생성 화면은 `_legacy/`로 보관, 목록의 생성 버튼 제거 | V2 |
 | 2026-10-31 | `optionalAuth`가 기존 authMiddleware 역할(회원+Guest), `memberAuth`가 membersOnly 역할 | #2 구조 개편 |
+| 2026-10-31 | **PG에는 회원만 저장**, Guest가 낀 방·참여·매칭·차단은 Redis. 예외: `reports.*_guest_id` | #3, actor_type 방식 대신 선택 |
+| 2026-10-31 | #3은 스키마 + **기존 라우트 SQL 수정까지** (앱 동작 유지) | PG Guest 로그인은 #5 전까지 501 |
+| 2026-10-31 | 프로필 사진·자기소개(bio) 제거, 캐릭터(`avatar_id`)로 대체 | PRD 익명 원칙 |
+| 2026-10-31 | 마이그레이션은 새 파일 추가 방식, `schema_migrations`로 기록 | 적용된 파일은 수정 금지 |
 | 2026-10-31 | CodeRabbit 리뷰 반영 커밋은 항상 **`[FIX]`** | 이슈 타입과 무관 |
 | 2026-10-31 | 이슈·커밋·PR 제목은 **`[TYPE]` 대문자 대괄호** 형식 | 예: `[FEAT] #5 Guest 세션 발급 API 추가`. 브랜치만 소문자 |
 
 ## ❓ 미결정 사항
 | 항목 | 결정 예정 이슈 |
 |---|---|
-| Guest를 DB 테이블에서 참조하는 방식 (`actor_type`+`actor_id`) | #3 |
 | 매칭·신고 API를 Guest에게도 열기 (현재 `memberAuth`) | #13, #16 |
-| 상대도 Guest인 1:1 방을 가입 전환할 때 상대 메시지 처리 | #14 |
+| 상대도 Guest인 1:1 방을 가입 전환할 때 방·상대 메시지 처리 | #14 |
 | 컬러·폰트 디자인 토큰 | #8 |
 | 웹 버전 Guest 토큰 저장 방식 (HttpOnly 쿠키 vs localStorage) | #5 |
 
 ## 📝 작업 메모
 - 기존 뼈대(TasteMate, 음식 취향 앱 기준)는 `main` 첫 커밋에 남아 있음 — 참고용
 - frontend 임시 아이콘(`assets/*.png`)은 #2에서 만든 placeholder — 정식 디자인은 #8
-- API 경로는 `/lounges`로 바뀌었지만 DB 테이블은 아직 `clubs`, `club_members` (#3에서 변경)
+- ⚠️ **#3 이후 로컬 DB는 초기화 필요**: `cd src/backend && npm run db:setup` (기존 TasteMate 테이블과 호환 안 됨)
+- 임시 API 형태(#3에서 유지): `POST /matching/find`, `PUT /users/me/tastes` 등은 각 기능 이슈(#7, #13)에서 api_spec 형태로 교체
+- 메시지·매칭 응답에 아직 `sender_id`/후보 `id`(실제 user_id)가 포함됨 → #10, #13에서 익명 참조로 교체
 - ⚠️ **현재 코드는 아직 목표 설계와 다름**: `routes/auth.js`의 Guest는 PostgreSQL `users`에 저장되고 24시간 JWT를 씀. Redis 기반 30분 Guest는 #5·#12에서 구현
 - `src/backend/.env`는 git 제외됨. 새 환경에서는 `.env.example` 복사
 - GitHub 이슈 #17(My Orbit) 아직 미등록

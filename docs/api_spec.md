@@ -4,6 +4,7 @@
 > - Base URL: `/api`
 > - 인증: `M` = memberAuth, `G` = guestAuth, `O` = optionalAuth(회원·Guest), `-` = 없음
 > - 에러 형식: `{ "error": { "code": "GUEST_EXPIRED", "message": "..." } }`
+> - ⚠️ #3 시점 실제 구현은 이전 경로를 유지합니다 (`PUT /users/me/tastes` body `{ tags: [{tagId, weight}] }`, `POST /matching/find`, `POST /matching/request/:targetId` 등). 각 기능 이슈에서 아래 명세로 교체합니다.
 
 ## 공통 에러 코드
 | code | HTTP | 설명 |
