@@ -42,8 +42,12 @@ export const api = {
   // 프로필
   getProfile: () => request('/users/me'),
   updateProfile: (data) => request('/users/me', { method: 'PUT', body: JSON.stringify(data) }),
-  updateTastes: (taste_option_ids) =>
-    request('/users/me/tastes', { method: 'PUT', body: JSON.stringify({ taste_option_ids }) }),
+  // tags: [{ tagId, weight(1~3) }] — 중요도 선택 UI는 #7
+  updateTastes: (tagIds) =>
+    request('/users/me/tastes', {
+      method: 'PUT',
+      body: JSON.stringify({ tags: tagIds.map((tagId) => ({ tagId, weight: 2 })) }),
+    }),
 
   // 취향
   getCategories: () => request('/tastes/categories'),

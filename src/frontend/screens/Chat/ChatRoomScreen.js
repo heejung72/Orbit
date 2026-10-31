@@ -11,7 +11,6 @@ export default function ChatRoomScreen({ route, navigation }) {
   const { roomId, title } = route.params;
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
-  const [myId, setMyId] = useState(null);
   const [isGuest, setIsGuest] = useState(false);
   const [showSignupBanner, setShowSignupBanner] = useState(false);
   const flatListRef = useRef(null);
@@ -20,8 +19,7 @@ export default function ChatRoomScreen({ route, navigation }) {
   useEffect(() => {
     navigation.setOptions({ title });
 
-    AsyncStorage.multiGet(['user', 'isGuest']).then(([[, u], [, g]]) => {
-      if (u) setMyId(JSON.parse(u).id);
+    AsyncStorage.getItem('isGuest').then((g) => {
       const guest = g === 'true';
       setIsGuest(guest);
       if (guest) setShowSignupBanner(true);
@@ -53,7 +51,7 @@ export default function ChatRoomScreen({ route, navigation }) {
   };
 
   const renderItem = ({ item }) => {
-    const isMine = item.sender_id === myId;
+    const isMine = item.is_mine; // 서버가 실제 user_id 대신 내 메시지 여부만 알려줌
     return (
       <View style={[styles.msgRow, isMine && styles.msgRowMine]}>
         {!isMine && (

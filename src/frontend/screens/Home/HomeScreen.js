@@ -7,6 +7,7 @@ import { useNavigation } from '@react-navigation/native';
 import { api } from '../../services/api';
 import VennDiagram from '../../_legacy/components/VennDiagram';
 import RadarChart from '../../_legacy/components/RadarChart';
+import { colors } from '../../theme';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.75;
@@ -73,7 +74,7 @@ export default function HomeScreen({ isGuest }) {
         </View>
         <View style={styles.matchCardInfo}>
           <Text style={styles.matchNickname}>{item.nickname}</Text>
-          <Text style={styles.matchBio} numberOfLines={2}>{item.bio || '자기소개가 없습니다'}</Text>
+          <Text style={styles.matchBio} numberOfLines={2}>{item.common_tags?.length ? `공통 취향: ${item.common_tags.slice(0, 3).join(' · ')}` : ''}</Text>
         </View>
       </View>
       <View style={styles.matchScoreRow}>
@@ -92,10 +93,10 @@ export default function HomeScreen({ isGuest }) {
   // 매칭 상세 모달 (벤다이어그램)
   const renderMatchModal = () => {
     if (!selectedMatch) return null;
-    const otherTastes = (selectedMatch.tastes || []).map(t => t.taste || t);
-    const shared = myTasteNames.filter(t => otherTastes.includes(t));
-    const myOnly = myTasteNames.filter(t => !otherTastes.includes(t));
-    const otherOnly = otherTastes.filter(t => !myTasteNames.includes(t));
+    // 상대의 전체 취향은 익명성을 위해 받지 않고, 서버가 계산한 공통 취향만 사용 (#13에서 화면 재구성)
+    const shared = selectedMatch.common_tags || [];
+    const myOnly = myTasteNames.filter(t => !shared.includes(t));
+    const otherOnly = [];
 
     // 레이더 차트 데이터: 카테고리별 취향 수 비교
     const categories = [...new Set([
@@ -144,7 +145,11 @@ export default function HomeScreen({ isGuest }) {
   // 취향 이미지 카드
   const renderTasteCard = ({ item: option }) => (
     <TouchableOpacity style={styles.tasteCard} activeOpacity={0.8}>
-      <Image source={{ uri: option.image_url }} style={styles.tasteImage} />
+      {option.image_url ? (
+        <Image source={{ uri: option.image_url }} style={styles.tasteImage} />
+      ) : (
+        <View style={[styles.tasteImage, styles.tastePlaceholder]} />
+      )}
       <View style={styles.tasteOverlay}>
         <Text style={styles.tasteName}>{option.name}</Text>
       </View>
@@ -198,7 +203,7 @@ export default function HomeScreen({ isGuest }) {
           <View key={cat.id} style={styles.section}>
             <Text style={styles.sectionTitle}>{cat.icon} {cat.name}</Text>
             <FlatList
-              data={cat.options.filter(o => o.image_url)}
+              data={cat.options}
               renderItem={renderTasteCard}
               keyExtractor={item => String(item.id)}
               horizontal
@@ -293,6 +298,7 @@ const styles = StyleSheet.create({
     width: 130, height: 160, borderRadius: 14, marginHorizontal: 6, overflow: 'hidden',
   },
   tasteImage: { width: '100%', height: '100%' },
+  tastePlaceholder: { backgroundColor: colors.primary }, // 이미지 없는 태그
   tasteOverlay: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: 'rgba(0,0,0,0.45)', paddingVertical: 8, paddingHorizontal: 10,

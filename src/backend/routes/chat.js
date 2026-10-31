@@ -1,68 +1,89 @@
 const express = require('express');
 const db = require('../db');
+const { getRoomForMember } = require('../services/chatAccess');
+const { toUuid, toPositiveInt, toIsoDate } = require('../utils/validate');
 
 const router = express.Router();
 
 // 내 채팅방 목록
 router.get('/rooms', async (req, res) => {
   try {
-    // 1:1 채팅방
+    // 1:1 채팅방 — 상대는 방 단위 익명 표시 이름으로
     const directRooms = await db.query(
       `SELECT cr.id, cr.type, cr.created_at,
-        u.nickname as partner_nickname, u.profile_image as partner_image,
-        (SELECT content FROM messages WHERE chat_room_id = cr.id ORDER BY created_at DESC LIMIT 1) as last_message,
-        (SELECT created_at FROM messages WHERE chat_room_id = cr.id ORDER BY created_at DESC LIMIT 1) as last_message_at
-       FROM chat_rooms cr
-       JOIN matches m ON cr.match_id = m.id
-       JOIN users u ON u.id = CASE WHEN m.user1_id = $1 THEN m.user2_id ELSE m.user1_id END
-       WHERE cr.type = 'direct' AND (m.user1_id = $1 OR m.user2_id = $1) AND m.status = 'accepted'
-       ORDER BY last_message_at DESC NULLS LAST`,
+              partner.display_name AS partner_nickname,
+              lm.content AS last_message, lm.created_at AS last_message_at
+       FROM chat_members me
+       JOIN chat_rooms cr ON cr.id = me.room_id AND cr.type = 'direct'
+       JOIN chat_members partner ON partner.room_id = cr.id AND partner.user_id <> me.user_id
+       LEFT JOIN LATERAL (
+         SELECT content, created_at FROM messages WHERE room_id = cr.id ORDER BY created_at DESC LIMIT 1
+       ) lm ON true
+       WHERE me.user_id = $1 AND me.left_at IS NULL
+       ORDER BY lm.created_at DESC NULLS LAST`,
       [req.userId]
     );
 
-    // 동호회 채팅방
-    const clubRooms = await db.query(
-      `SELECT cr.id, cr.type, cr.created_at, c.name as lounge_name,
-        (SELECT content FROM messages WHERE chat_room_id = cr.id ORDER BY created_at DESC LIMIT 1) as last_message,
-        (SELECT created_at FROM messages WHERE chat_room_id = cr.id ORDER BY created_at DESC LIMIT 1) as last_message_at
-       FROM chat_rooms cr
-       JOIN clubs c ON cr.club_id = c.id
-       JOIN club_members cm ON cm.club_id = c.id AND cm.user_id = $1
-       WHERE cr.type = 'club'
-       ORDER BY last_message_at DESC NULLS LAST`,
+    // 내가 참여한 라운지 채팅방
+    const loungeRooms = await db.query(
+      `SELECT cr.id, cr.type, cr.created_at, l.id AS lounge_id, l.name AS lounge_name,
+              lmsg.content AS last_message, lmsg.created_at AS last_message_at
+       FROM lounge_members lm
+       JOIN lounges l ON l.id = lm.lounge_id
+       JOIN chat_rooms cr ON cr.lounge_id = l.id
+       LEFT JOIN LATERAL (
+         SELECT content, created_at FROM messages WHERE room_id = cr.id ORDER BY created_at DESC LIMIT 1
+       ) lmsg ON true
+       WHERE lm.user_id = $1
+       ORDER BY lmsg.created_at DESC NULLS LAST`,
       [req.userId]
     );
 
-    res.json({ direct: directRooms.rows, lounges: clubRooms.rows });
+    res.json({ direct: directRooms.rows, lounges: loungeRooms.rows });
   } catch (err) {
     res.status(500).json({ error: '서버 오류가 발생했습니다' });
   }
 });
 
-// 메시지 조회
+// 메시지 조회 (커서: before = ISO 시각)
 router.get('/rooms/:roomId/messages', async (req, res) => {
   try {
-    const { roomId } = req.params;
-    const limit = parseInt(req.query.limit) || 50;
-    const before = req.query.before; // 커서 기반 페이지네이션
+    const roomId = toUuid(req.params.roomId);
+    if (!roomId) return res.status(404).json({ error: '채팅방을 찾을 수 없습니다' });
 
-    let query = `
-      SELECT m.id, m.content, m.type, m.created_at, m.sender_id, m.guest_session_id,
-        u.nickname as sender_nickname, u.profile_image as sender_image, u.is_guest
-      FROM messages m
-      LEFT JOIN users u ON m.sender_id = u.id OR m.guest_session_id = u.id
-      WHERE m.chat_room_id = $1`;
-    const params = [roomId];
+    const room = await getRoomForMember(roomId, req.userId);
+    if (!room) return res.status(404).json({ error: '채팅방을 찾을 수 없습니다' });
 
-    if (before) {
-      query += ` AND m.created_at < $2`;
-      params.push(before);
+    const limit = toPositiveInt(req.query.limit, 50, 100);
+    let before = null;
+    if (req.query.before !== undefined) {
+      before = toIsoDate(req.query.before);
+      if (!before) return res.status(400).json({ error: 'before 값이 올바르지 않습니다' });
     }
 
-    query += ` ORDER BY m.created_at DESC LIMIT $${params.length + 1}`;
+    const params = [roomId, req.userId];
+    let where = 'm.room_id = $1';
+    if (before) {
+      params.push(before);
+      where += ` AND m.created_at < $${params.length}`;
+    }
     params.push(limit);
 
-    const result = await db.query(query, params);
+    // 실제 user_id는 내려주지 않고 is_mine으로만 구분 (docs/prd.md §3-6)
+    // 표시 이름: 1:1은 방 단위 display_name, 라운지는 회원 닉네임
+    const result = await db.query(
+      `SELECT m.id, m.content, m.created_at,
+              (m.sender_id = $2) AS is_mine,
+              COALESCE(cm.display_name, u.nickname, '떠난 궤도') AS sender_nickname,
+              false AS is_guest
+       FROM messages m
+       LEFT JOIN users u ON u.id = m.sender_id
+       LEFT JOIN chat_members cm ON cm.room_id = m.room_id AND cm.user_id = m.sender_id
+       WHERE ${where}
+       ORDER BY m.created_at DESC
+       LIMIT $${params.length}`,
+      params
+    );
     res.json(result.rows.reverse());
   } catch (err) {
     res.status(500).json({ error: '서버 오류가 발생했습니다' });

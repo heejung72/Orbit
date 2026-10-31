@@ -1,17 +1,22 @@
 const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
 const { filterMessage, containsBadWords } = require('../middleware/profanityFilter');
+const { getRoomForMember } = require('../services/chatAccess');
 
+// Socket.io
+// TODO(#10): 이벤트 이름을 설계(room:join, message:send, message:new …)로 변경, Guest(Redis) 지원,
+//            모든 이벤트에서 Guest expiresAt 검사
+// TODO(#16): send_message 사용자 단위 Rate Limit (Redis)
 function setupSocket(io) {
-  // 인증 미들웨어 (게스트 토큰도 허용)
+  // 인증: 회원 JWT만 허용 (Guest는 #5에서 guestToken으로 추가)
   io.use((socket, next) => {
     const token = socket.handshake.auth.token;
     if (!token) return next(new Error('인증이 필요합니다'));
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (decoded.isGuest) return next(new Error('Guest 연결은 준비 중입니다'));
       socket.userId = decoded.userId;
-      socket.isGuest = decoded.isGuest || false;
+      socket.data.userId = decoded.userId; // fetchSockets()에서 읽기 위해
       next();
     } catch {
       next(new Error('유효하지 않은 토큰입니다'));
@@ -19,64 +24,66 @@ function setupSocket(io) {
   });
 
   io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.userId}`);
-
-    // 채팅방 참가
-    socket.on('join_room', (roomId) => {
-      socket.join(roomId);
+    // 채팅방 참가 — 접근 가능한 방만
+    socket.on('join_room', async (roomId) => {
+      try {
+        const room = await getRoomForMember(roomId, socket.userId);
+        if (!room) return socket.emit('error', { message: '채팅방에 들어갈 수 없습니다' });
+        socket.join(room.id);
+      } catch {
+        socket.emit('error', { message: '채팅방에 들어갈 수 없습니다' });
+      }
     });
 
-    // 채팅방 나가기
     socket.on('leave_room', (roomId) => {
       socket.leave(roomId);
     });
 
     // 메시지 전송
     socket.on('send_message', async (data) => {
-      const { roomId, content, type = 'text' } = data;
+      const roomId = data && data.roomId;
+      const content = typeof data?.content === 'string' ? data.content.trim() : '';
+      if (!roomId || !content || content.length > 1000) {
+        return socket.emit('error', { message: '메시지를 확인해주세요' });
+      }
 
-      // 비속어 필터링
-      const filteredContent = containsBadWords(content) ? filterMessage(content) : content;
-
-      // DB 저장
-      const msgId = uuidv4();
       try {
-        await db.query(
-          `INSERT INTO messages (id, chat_room_id, sender_id, guest_session_id, content, type) VALUES ($1, $2, $3, $4, $5, $6)`,
-          [msgId, roomId, socket.isGuest ? null : socket.userId, socket.isGuest ? socket.userId : null, filteredContent, type]
-        );
+        const room = await getRoomForMember(roomId, socket.userId);
+        if (!room || room.closed_at) return socket.emit('error', { message: '메시지를 보낼 수 없는 방입니다' });
 
+        const filtered = containsBadWords(content) ? filterMessage(content) : content;
+        const { rows } = await db.query(
+          `INSERT INTO messages (room_id, sender_id, content) VALUES ($1, $2, $3)
+           RETURNING id, created_at`,
+          [room.id, socket.userId, filtered]
+        );
         const sender = await db.query(
-          'SELECT nickname, profile_image, is_guest FROM users WHERE id = $1',
-          [socket.userId]
+          `SELECT COALESCE(cm.display_name, u.nickname) AS nickname
+           FROM users u LEFT JOIN chat_members cm ON cm.room_id = $1 AND cm.user_id = u.id
+           WHERE u.id = $2`,
+          [room.id, socket.userId]
         );
 
+        // 실제 user_id 대신 is_mine: 보낸 사람에게는 true, 나머지에게는 false
         const message = {
-          id: msgId,
-          chat_room_id: roomId,
-          sender_id: socket.userId,
-          sender_nickname: sender.rows[0].nickname,
-          sender_image: sender.rows[0].profile_image,
-          is_guest: sender.rows[0].is_guest,
-          content: filteredContent,
-          type,
-          created_at: new Date().toISOString(),
+          id: rows[0].id,
+          room_id: room.id,
+          sender_nickname: sender.rows[0]?.nickname,
+          is_guest: false,
+          content: filtered,
+          created_at: rows[0].created_at,
         };
-
-        // 같은 방 전체에 브로드캐스트
-        io.to(roomId).emit('new_message', message);
-      } catch (err) {
+        // 같은 회원의 다른 기기에서도 내 메시지로 보이도록 소켓마다 비교
+        for (const s of await io.in(room.id).fetchSockets()) {
+          s.emit('new_message', { ...message, is_mine: s.data.userId === socket.userId });
+        }
+      } catch {
         socket.emit('error', { message: '메시지 전송에 실패했습니다' });
       }
     });
 
-    // 타이핑 표시
     socket.on('typing', (roomId) => {
-      socket.to(roomId).emit('user_typing', { userId: socket.userId });
-    });
-
-    socket.on('disconnect', () => {
-      console.log(`User disconnected: ${socket.userId}`);
+      if (socket.rooms.has(roomId)) socket.to(roomId).emit('user_typing', {});
     });
   });
 }

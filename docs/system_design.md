@@ -111,8 +111,8 @@ sequenceDiagram
 ### 4-3. 메시지 저장 규칙
 | 상황 | 저장 위치 |
 |---|---|
-| Member ↔ Member 1:1 | PostgreSQL `messages` |
-| Member/Guest ↔ Guest 1:1 | Redis `room:{id}:guestmsgs` (방 전체를 임시방으로 취급) |
+| Member ↔ Member 1:1 | PostgreSQL `messages` (방: `chat_rooms` + `chat_members`) |
+| Member/Guest ↔ Guest 1:1 | Redis `room:{id}:guestmsgs` — **방 자체도 Redis에만** 존재 (PG `chat_rooms` 행 없음) |
 | 라운지에서 Member가 보낸 메시지 | PostgreSQL `messages` |
 | 라운지에서 Guest가 보낸 메시지 | Redis (만료 시 삭제) |
 
@@ -123,7 +123,8 @@ sequenceDiagram
 2. 서버 트랜잭션:
    - users 생성
    - `guest:tastes` → `user_tastes` INSERT
-   - `guest:rooms`의 방 → `chat_members`의 actor를 member로 교체, 방의 `is_temporary=false`
+   - `guest:rooms`의 방(Redis 임시방) → 상대가 **회원**이면 `chat_rooms`(direct) + `chat_members` 2행을 PG에 새로 생성 / 상대가 **Guest**면 방은 Redis에 그대로 두고 본인만 회원으로 표시 (#14에서 확정)
+   - 참여 중인 라운지 → `lounge_members` INSERT
    - `room:{id}:guestmsgs`에서 **가입한 Guest 본인이 보낸 메시지만** → `messages` INSERT (sender = 새 userId)
    - 같은 방의 **Member 메시지**는 원래 작성자(sender_id)를 그대로 유지한다 (이미 PG에 있으면 그대로, Redis에 있으면 원 작성자로 INSERT)
    - **다른 Guest(가입하지 않은 상대)의 메시지는 PostgreSQL로 이전하지 않는다** — Guest 메시지 보관 정책 유지. 해당 Guest 만료 시 Redis에서 삭제

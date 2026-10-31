@@ -9,20 +9,18 @@ export default function MyOrbitScreen({ navigation, onLogout }) {
   const [profile, setProfile] = useState(null);
   const [editing, setEditing] = useState(false);
   const [nickname, setNickname] = useState('');
-  const [bio, setBio] = useState('');
 
   useEffect(() => {
     api.getProfile().then(data => {
       setProfile(data);
       setNickname(data.nickname);
-      setBio(data.bio || '');
     }).catch(() => {});
   }, []);
 
   const handleSave = async () => {
     try {
-      await api.updateProfile({ nickname, bio });
-      setProfile(prev => ({ ...prev, nickname, bio }));
+      await api.updateProfile({ nickname });
+      setProfile(prev => ({ ...prev, nickname }));
       setEditing(false);
       Alert.alert('완료', '프로필이 수정되었습니다');
     } catch (err) {
@@ -54,7 +52,6 @@ export default function MyOrbitScreen({ navigation, onLogout }) {
         {editing ? (
           <>
             <TextInput style={styles.input} value={nickname} onChangeText={setNickname} placeholder="닉네임" />
-            <TextInput style={[styles.input, styles.bioInput]} value={bio} onChangeText={setBio} placeholder="자기소개" multiline />
             <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
               <Text style={styles.saveText}>저장</Text>
             </TouchableOpacity>
@@ -62,7 +59,6 @@ export default function MyOrbitScreen({ navigation, onLogout }) {
         ) : (
           <>
             <Text style={styles.nickname}>{profile.nickname}</Text>
-            <Text style={styles.bio}>{profile.bio || '자기소개를 입력해보세요'}</Text>
             <TouchableOpacity style={styles.editButton} onPress={() => setEditing(true)}>
               <Text style={styles.editText}>프로필 수정</Text>
             </TouchableOpacity>
