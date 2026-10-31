@@ -1,7 +1,7 @@
 ---
 name: "✨ Feature"
 about: 새 기능 개발
-title: "[Feat] "
+title: "[FEAT] "
 labels: enhancement
 ---
 

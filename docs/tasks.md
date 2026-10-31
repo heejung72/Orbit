@@ -14,18 +14,18 @@
 | 3 | [REFACTOR] 스키마 재설계 | `refactor/#3-db-schema` | 2 | ⬜ |
 | 4 | [FEAT] 회원 인증 | `feat/#4-member-auth` | 3 | ⬜ |
 | 5 | [FEAT] Guest 세션 | `feat/#5-guest-session` | 3 | ⬜ |
-| 6 | [Feat] Welcome 화면 | `feat/#6-welcome` | 4, 5 | ⬜ |
-| 7 | [Feat] 취향 시스템 | `feat/#7-taste-system` | 4, 5 | ⬜ |
-| 8 | [Feat] Orbit Dashboard (Home) | `feat/#8-dashboard` | 7, 9 | ⬜ |
-| 9 | [Feat] 하단 탭 네비게이션 | `feat/#9-tab-navigation` | 6 | ⬜ |
-| 10 | [Feat] Socket.io 실시간 채팅 기반 | `feat/#10-socket-chat` | 4, 5 | ⬜ |
-| 11 | [Feat] 취향 라운지 | `feat/#11-lounge` | 10 | ⬜ |
-| 12 | [Feat] Guest Time Attack | `feat/#12-guest-time-attack` | 5, 10 | ⬜ |
-| 13 | [Feat] 1:1 취향 매칭 | `feat/#13-matching` | 7, 10 | ⬜ |
-| 14 | [Feat] Guest → 회원 전환 | `feat/#14-guest-upgrade` | 12, 13 | ⬜ |
-| 15 | [Feat] 오늘의 질문 | `feat/#15-today-question` | 8, 13 | ⬜ |
-| 16 | [Feat] 신고·차단, 비속어 필터·스팸 Rate Limit | `feat/#16-safety` | 10 | ⬜ |
-| 17 | [Feat] My Orbit *(GitHub 이슈 미등록 — 등록 필요)* | `feat/#17-my-orbit` | 7, 9 | ⬜ |
+| 6 | [FEAT] Welcome 화면 | `feat/#6-welcome` | 4, 5 | ⬜ |
+| 7 | [FEAT] 취향 시스템 | `feat/#7-taste-system` | 4, 5 | ⬜ |
+| 8 | [FEAT] Orbit Dashboard (Home) | `feat/#8-dashboard` | 7, 9 | ⬜ |
+| 9 | [FEAT] 하단 탭 네비게이션 | `feat/#9-tab-navigation` | 6 | ⬜ |
+| 10 | [FEAT] Socket.io 실시간 채팅 기반 | `feat/#10-socket-chat` | 4, 5 | ⬜ |
+| 11 | [FEAT] 취향 라운지 | `feat/#11-lounge` | 10 | ⬜ |
+| 12 | [FEAT] Guest Time Attack | `feat/#12-guest-time-attack` | 5, 10 | ⬜ |
+| 13 | [FEAT] 1:1 취향 매칭 | `feat/#13-matching` | 7, 10 | ⬜ |
+| 14 | [FEAT] Guest → 회원 전환 | `feat/#14-guest-upgrade` | 12, 13 | ⬜ |
+| 15 | [FEAT] 오늘의 질문 | `feat/#15-today-question` | 8, 13 | ⬜ |
+| 16 | [FEAT] 신고·차단, 비속어 필터·스팸 Rate Limit | `feat/#16-safety` | 10 | ⬜ |
+| 17 | [FEAT] My Orbit *(GitHub 이슈 미등록 — 등록 필요)* | `feat/#17-my-orbit` | 7, 9 | ⬜ |
 
 **권장 진행 순서:** 1 → 2 → 3 → 4 → 5 → 6 → 9 → 7 → 8 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17
 
@@ -88,31 +88,31 @@
 - [ ] 앱: guestToken SecureStore 저장, `AuthContext`에 actor 타입 반영
 - [ ] GuestEntry 화면 (발급된 닉네임·캐릭터, "30분 동안 머물 수 있어요" 안내)
 
-## #6 [Feat] Welcome 화면
+## #6 [FEAT] Welcome 화면
 - [ ] Orbit 로고/카피 "Find your people in the same orbit."
 - [ ] [회원가입] [로그인] [가입 없이 둘러보기]
 - [ ] 진입 분기: 토큰 있음 → Home / Guest 토큰 유효 → Home / 없음 → Welcome
 - [ ] 첫 진입 후 취향 미설정이면 TasteSelect로
 
-## #7 [Feat] 취향 시스템
+## #7 [FEAT] 취향 시스템
 - [ ] `GET /tastes/categories`, `GET/PUT /tastes/me` (Member→PG, Guest→Redis)
 - [ ] TasteSelect: 카테고리 탭 → 태그 칩 다중 선택 → 중요도(3/2/1) 선택
 - [ ] 선택 요약 ("선택한 취향 4개: Oasis · The 1975 · ...")
 - [ ] `TasteTags` 컴포넌트 (Home·MyOrbit 재사용)
 
-## #8 [Feat] Orbit Dashboard (Home)
+## #8 [FEAT] Orbit Dashboard (Home)
 - [ ] `GET /home` 묶음 API
 - [ ] `OrbitVisualization`: 중앙 내 캐릭터, 주변 취향 행성(카테고리별), 바깥 궤도 점(비슷한 사람, 온라인은 빛남), 행성 터치 → 해당 카테고리 라운지
 - [ ] Header (인사말, 닉네임, Guest 타이머 자리)
 - [ ] My Taste / Today's Question 카드 / Active Lounges / Quick Action
 - [ ] `theme/` 컬러·폰트 토큰 정의 + `docs/design.md` 작성
 
-## #9 [Feat] 하단 탭 네비게이션
+## #9 [FEAT] 하단 탭 네비게이션
 - [ ] RootNavigator (Welcome/Auth/Guest 스택 ↔ MainTabs)
 - [ ] MainTabs: Home / Lounge / Chat / My Orbit (아이콘, 활성 색)
 - [ ] 각 탭 placeholder 화면 연결
 
-## #10 [Feat] Socket.io 실시간 채팅 기반
+## #10 [FEAT] Socket.io 실시간 채팅 기반
 - [ ] 소켓 인증 (JWT / guestToken)
 - [ ] 이벤트: `room:join`, `room:leave`, `message:send`, `message:new`, `typing` ([system_design.md §5](./system_design.md))
 - [ ] 저장 규칙: Member→PG, Guest 관련→Redis ([§4-3](./system_design.md))
@@ -121,47 +121,47 @@
 - [ ] ChatList, ChatRoom 화면 (말풍선, 익명 닉네임·캐릭터)
 - [ ] 온라인 상태 `online:actors`
 
-## #11 [Feat] 취향 라운지
+## #11 [FEAT] 취향 라운지
 - [ ] `GET /lounges`, `/lounges/recommended`, `/lounges/:id`, `/lounges/:id/messages`
 - [ ] 실시간 인원 `room:presence`
 - [ ] LoungeList (카테고리 필터, 인기순), LoungeChat (그룹 채팅)
 - [ ] Home의 Active Lounges 연결
 
-## #12 [Feat] Guest Time Attack
+## #12 [FEAT] Guest Time Attack
 - [ ] `GuestTimer` 컴포넌트 (mm:ss, 5분 이하 강조색)
 - [ ] 서버 만료 스케줄러 `jobs/guestExpiry.js` (30초 주기): 소켓 강제 종료, Redis 정리, 방 퇴장 브로드캐스트
 - [ ] `guest:warning`(5분 전), `guest:expired` 이벤트
 - [ ] 앱: 만료 시 토큰 삭제 → "궤도가 사라졌어요" 화면 → Welcome
 - [ ] 앱이 백그라운드였다가 돌아와도 `expiresAt` 기준으로 정확히 계산
 
-## #13 [Feat] 1:1 취향 매칭
+## #13 [FEAT] 1:1 취향 매칭
 - [ ] `services/matching` 가중치 코사인 유사도 + 제외 규칙 ([system_design.md §6](./system_design.md))
 - [ ] `GET /matching/candidates`, 요청/수락/거절 API + `match:request`/`match:accepted` 이벤트
 - [ ] Matching 화면 (상대 캐릭터, 닉네임, 공통 취향 3개, [대화 요청])
 - [ ] 수락 시 1:1 방 생성 (Guest 포함 시 `is_temporary=true`)
 - [ ] 대화 주제 추천 `GET /chat/rooms/:id/topics` + ChatRoom 상단 카드
 
-## #14 [Feat] Guest → 회원 전환
+## #14 [FEAT] Guest → 회원 전환
 - [ ] `SignupNudgeModal` (3가지 트리거: 기록 저장 버튼 / 만료 5분 전 / 메시지 20개)
 - [ ] Register에 `X-Guest-Token` 전달
 - [ ] `services/migration` 트랜잭션 ([system_design.md §4-4](./system_design.md)): 취향·방·메시지·답변 이전
 - [ ] 소켓 재인증 `auth:upgrade`, 상대 화면 닉네임 유지
 - [ ] 상대도 Guest인 방의 처리 방식 결정 후 문서 반영
 
-## #15 [Feat] 오늘의 질문
+## #15 [FEAT] 오늘의 질문
 - [ ] seed 질문 순환 (publish_date 기준, 없으면 순번)
 - [ ] `GET /questions/today`, 답변 작성/조회, 답변자에게 대화 요청
 - [ ] Home 카드 + TodayQuestion 화면 (답변 → 다른 답변 리스트 → 대화 시작)
 - [ ] Guest 답변은 Redis
 
-## #16 [Feat] 신고·차단, 비속어 필터·스팸 Rate Limit
+## #16 [FEAT] 신고·차단, 비속어 필터·스팸 Rate Limit
 - [ ] `POST /reports` (메시지 스냅샷 저장), `POST/DELETE /blocks`
 - [ ] 차단 시: 1:1 방 종료, 매칭 후보 제외, 라운지 메시지 숨김
 - [ ] `profanityFilter` (단어 목록 + 마스킹 `***`)
 - [ ] `rateLimit` (Redis, 메시지 초당 2회 / 동일 메시지 3회 연속 차단)
 - [ ] 메시지 길게 누르기 → 신고/차단 시트, Report 화면
 
-## #17 [Feat] My Orbit
+## #17 [FEAT] My Orbit
 - [ ] 내 캐릭터·닉네임 표시 및 변경 (`PATCH /users/me`)
 - [ ] 취향 관리 (TasteSelect 재사용)
 - [ ] 계정 설정: 로그아웃, 탈퇴

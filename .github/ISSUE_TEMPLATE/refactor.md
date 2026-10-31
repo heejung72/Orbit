@@ -1,7 +1,7 @@
 ---
 name: "♻️ Refactor"
 about: 동작 변경 없는 구조 개선
-title: "[Refactor] "
+title: "[REFACTOR] "
 labels: refactor
 ---
 
