@@ -9,8 +9,8 @@
 
 | # | 이슈 | 브랜치 | 선행 | 상태 |
 |---|---|---|---|---|
-| 1 | [DOCS] 프로젝트 재정비 및 Git/브랜치 전략 세팅 | `docs/#1-project-setup` | - | 🟨 |
-| 2 | [REFACTOR] 디렉토리 구조 개편 | `refactor/#2-directory-structure` | 1 | ⬜ |
+| 1 | [DOCS] 프로젝트 재정비 및 Git/브랜치 전략 세팅 | `docs/#1-project-setup` | - | ✅ |
+| 2 | [REFACTOR] 디렉토리 구조 개편 | `refactor/#2-directory-structure` | 1 | 🟨 |
 | 3 | [REFACTOR] 스키마 재설계 | `refactor/#3-db-schema` | 2 | ⬜ |
 | 4 | [FEAT] 회원 인증 | `feat/#4-member-auth` | 3 | ⬜ |
 | 5 | [FEAT] Guest 세션 | `feat/#5-guest-session` | 3 | ⬜ |
@@ -49,17 +49,23 @@
 
 ## #2 [REFACTOR] 디렉토리 구조 개편
 **목표:** [system_design.md §7](./system_design.md) 구조로 옮긴다. 기능 추가는 하지 않는다.
-- [ ] frontend: `screens/*Screen.js` → 폴더 구조 (Welcome, Auth, GuestEntry, TasteSelect, Home, Lounge, Chat, TodayQuestion, MyOrbit)
-- [ ] Club 화면 3개 → Lounge (ClubList→LoungeList, ClubDetail→LoungeChat, ClubCreate는 V2라 제거 또는 보관)
-- [ ] `components/` 폴더 생성 (OrbitVisualization, Avatar, TasteTags, GuestTimer, SignupNudgeModal) — 빈 placeholder
-- [ ] 기존 `RadarChart`, `VennDiagram` 처리 결정 (MVP 미사용 → `_legacy/` 이동 또는 삭제)
-- [ ] `navigation/`, `context/`, `theme/` 생성
-- [ ] backend: `routes/clubs.js` → `routes/lounges.js`, `routes/public.js` 정리, `guest`, `questions` 라우트 파일 생성(빈 라우터)
-- [ ] backend: `socket/`, `seeds/`, `redis.js`, middleware 분리(memberAuth/guestAuth/optionalAuth/rateLimit/profanityFilter)
-- [ ] `jobs/cleanupGuests.js` → `jobs/guestExpiry.js`
-- [ ] 앱·서버가 기존처럼 실행되는지 확인
+- [x] frontend: `screens/*Screen.js` → 폴더 구조 (Welcome, Auth, GuestEntry, TasteSelect, Home, Lounge, Chat, TodayQuestion, MyOrbit)
+- [x] Club 화면 → Lounge (ClubList→LoungeList, ClubDetail→LoungeChat, 화면 문구 동호회→라운지), ClubCreate는 V2라 `_legacy/` 보관 + 목록의 생성 버튼 제거
+- [x] Profile → `MyOrbit/MyOrbitScreen`
+- [x] `components/` placeholder (OrbitVisualization, Avatar, TasteTags, GuestTimer, SignupNudgeModal) + 빈 화면(Welcome, GuestEntry, TodayQuestion)
+- [x] `RadarChart`, `VennDiagram` → `_legacy/components/` (Home·MyOrbit 임시 사용, #8·#17에서 제거)
+- [x] `navigation/`(RootNavigator, MainTabs), `context/AuthContext`, `theme/`, `services/storage.js` 생성 — 탭 이름 Home / Lounge / Chat / MyOrbit
+- [x] frontend API: `/clubs` → `/lounges`, `getClub*` → `getLounge*`
+- [x] backend: `routes/clubs.js` → `routes/lounges.js` (`/api/lounges`), `public.js`의 `/clubs` → `/lounges`, 응답 키 `popularClubs`→`popularLounges`, 채팅 목록 `clubs`→`lounges`, `club_name`→`lounge_name` (DB 테이블명은 #3)
+- [x] backend: 빈 라우터 `routes/guest.js`(#5), `routes/questions.js`(#15) 생성·마운트
+- [x] backend: `socket/index.js`, `seeds/`, `redis.js`(연결은 #5), middleware 분리 — `optionalAuth`(기존 동작), `memberAuth`, `guestAuth`(501, #5), `rateLimit`(통과, #16), `profanityFilter`
+- [x] `jobs/cleanupGuests.js` → `jobs/guestExpiry.js`, 스크립트 `npm run guest:expiry`
+- [x] (추가) `app.json`의 미설치 `expo-router` 플러그인 제거 — 기존에 앱 빌드가 실패하던 원인
+- [x] (추가) 깨진 1×1 아이콘·스플래시 PNG를 임시 Orbit 아이콘으로 교체, 미사용 카메라·사진 권한 문구 제거
+- [x] 확인: backend 전체 `node --check` + `server.js` 모듈 로드 / frontend `npx expo export --platform web` 성공
 
 **완료 기준:** `npm run dev`(backend), `npx expo start`(frontend)가 에러 없이 실행된다.
+> DB 연결이 필요한 실제 서버 실행·앱 화면 이동은 로컬(Mac)에서 확인 필요
 
 ## #3 [REFACTOR] 스키마 재설계
 - [ ] 기존 `001_init.sql`, `002_guest_and_images.sql` 정리 → 새 `001_init.sql`

@@ -186,14 +186,15 @@ src/
 │   │   └── SignupNudgeModal/
 │   ├── context/             # AuthContext (actor, token, expiresAt)
 │   ├── theme/               # colors, typography, spacing
-│   └── services/            # api.js, socket.js, storage.js
+│   ├── services/            # api.js, socket.js, storage.js
+│   └── _legacy/             # MVP에서 쓰지 않는 이전 코드 보관 (새 코드에서 import 금지)
 │
 ├── backend/
 │   ├── server.js
 │   ├── db.js
 │   ├── redis.js
 │   ├── routes/              # auth, guest, users, tastes, matching, lounges, chat, questions, reports
-│   ├── services/            # guestSession, matching, chat, orbit, migration(guest→member)
+│   ├── services/            # matching (이후 추가: guestSession, chat, orbit, migration)
 │   ├── socket/              # index.js, handlers/
 │   ├── middleware/          # memberAuth, guestAuth, optionalAuth, rateLimit, profanityFilter
 │   ├── jobs/                # guestExpiry
