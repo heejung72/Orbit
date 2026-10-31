@@ -85,8 +85,13 @@ git commit -m "[FEAT] #5 Guest 세션 발급 API 추가"
 
 ```bash
 git push -u origin feat/#5-guest-session
-gh pr create --base main --title "[FEAT] #5 Guest 세션" --body "Closes #5"
+
+# 템플릿을 복사해서 Closes #5, 변경 사항, 체크리스트를 채운 뒤 --body-file로 전달
+cp .github/pull_request_template.md /tmp/pr-body.md
+# (편집기로 /tmp/pr-body.md 작성)
+gh pr create --base main --title "[FEAT] #5 Guest 세션" --body-file /tmp/pr-body.md
 ```
+> `--body "..."`를 쓰면 템플릿이 무시되므로 사용하지 않습니다. 웹에서 PR을 만들면 템플릿이 자동으로 채워집니다.
 
 ## 4-1. 이슈 제목
 - 같은 형식: **`[TYPE] 제목`** — 예: `[FEAT] Guest 세션`, `[REFACTOR] 스키마 재설계`
@@ -107,6 +112,7 @@ gh pr create --base main --title "[FEAT] #5 Guest 세션" --body "Closes #5"
 2. CodeRabbit 리뷰 확인 → 반영 또는 resolve
 3. 템플릿 체크리스트 체크
 4. **Squash and merge** → 브랜치 삭제
+5. 다음 이슈 브랜치의 첫 커밋에서 `progress.md`에 완료 반영 (§5)
 
 ## 5. 머지 후
 ```bash
@@ -114,7 +120,11 @@ git checkout main
 git pull
 git branch -d feat/#5-guest-session
 ```
-그리고 [docs/progress.md](docs/progress.md)의 **지금 상태 / 완료한 이슈 / 결정 로그**를 갱신합니다.
+### progress.md 갱신 규칙
+`main` 직접 push는 금지이므로 진행 기록은 다음처럼 PR 안에서 갱신합니다.
+- **머지 전 (현재 PR에서):** 해당 이슈 체크리스트 체크, 상태 🟨 PR 리뷰, "지금 상태"를 "PR 리뷰 중"으로, 이번에 내린 결정을 결정 로그에 추가
+- **머지 후 (다음 이슈 PR의 첫 커밋에서):** 직전 이슈를 ✅ / "완료한 이슈" 표로 옮기고(PR 번호·머지일), "지금 상태"를 새 이슈로 변경
+  - 커밋 예: `[DOCS] #2 progress.md 갱신 (#1 완료 반영)`
 
 ## 6. 지켜야 할 것
 - `.env`는 절대 커밋하지 않기 (`.env.example`만)

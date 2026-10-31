@@ -63,7 +63,8 @@ reviews:
     - path: "src/frontend/**"
       instructions: |
         React Native(Expo) 앱이며 iOS·Android·Web을 함께 지원합니다.
-        - 토큰(JWT, guestToken)은 앱에서 Expo SecureStore에 저장해야 합니다. AsyncStorage에 토큰을 저장하면 지적하세요.
+        - iOS·Android에서는 토큰(JWT, guestToken)을 Expo SecureStore에 저장해야 합니다. 네이티브에서 AsyncStorage에 토큰을 저장하면 지적하세요.
+        - Web의 토큰 저장 방식(HttpOnly 쿠키 vs localStorage)은 docs/progress.md 미결정 사항입니다. 결정 전에는 Platform.OS === 'web' 분기로 분리되어 있는지만 확인하고, 방식 자체는 지적하지 마세요.
         - Guest 타이머는 expiresAt 기준으로 계산해야 합니다. 앱이 백그라운드에서 돌아와도 남은 시간이 정확한지 확인하세요.
         - 색상·폰트·간격 값을 하드코딩하지 말고 theme/ 토큰을 사용하는지 확인하세요.
         - 소켓 리스너와 setInterval이 컴포넌트 언마운트 시 정리(cleanup)되는지 확인하세요.

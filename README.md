@@ -25,6 +25,8 @@ Orbit은 음악·영화·책·여행 등 개인의 취향을 기반으로 비슷
 
 ## Member / Guest
 
+> ⚠️ **목표 설계(MVP 기준)입니다.** 현재 코드는 이전 뼈대 상태라 Guest를 PostgreSQL에 저장하고 24시간 토큰을 사용합니다. 아래 정책은 #5(Guest 세션)·#12(Time Attack)·#14(회원 전환)에서 구현됩니다. 진행 상황은 [docs/progress.md](docs/progress.md)를 확인하세요.
+
 | | Member | Guest |
 |---|---|---|
 | 진입 | 이메일 회원가입 | 가입 없이 바로 입장 |
@@ -44,7 +46,7 @@ Orbit은 음악·영화·책·여행 등 개인의 취향을 기반으로 비슷
 | Cache / 임시 저장 | Redis (Guest 세션·데이터, 온라인 상태, Rate Limit) |
 | Auth | JWT + bcrypt (회원) · Guest 세션 토큰 |
 
-## 시스템 아키텍처
+## 시스템 아키텍처 (목표)
 
 ```mermaid
 graph TB
@@ -72,7 +74,7 @@ graph TB
     WS --> RD
 ```
 
-## API 흐름
+## API 흐름 (목표)
 
 ### Guest 입장 → 대화 → 만료 / 가입
 

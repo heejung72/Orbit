@@ -5,8 +5,8 @@
 ## 🔖 지금 상태
 - **현재 이슈:** #1 [DOCS] 프로젝트 재정비 및 Git/브랜치 전략 세팅
 - **브랜치:** `docs/#1-project-setup`
-- **상태:** 문서 작성 완료 → 커밋·PR 대기
-- **다음 할 일:** #1 PR 머지 → `refactor/#2-directory-structure` 브랜치 생성 → [tasks.md #2](./tasks.md#2-refactor-디렉토리-구조-개편) 진행
+- **상태:** 문서 작성 완료 → PR #18 리뷰 중 (CodeRabbit 리뷰 반영 완료)
+- **다음 할 일:** PR #18 머지 → `refactor/#2-directory-structure` 브랜치 생성 → 첫 커밋으로 #1 완료 반영 → [tasks.md #2](./tasks.md#2-refactor-디렉토리-구조-개편) 진행
 
 ## ✅ 완료한 이슈
 | # | 제목 | PR | 머지일 |
@@ -25,6 +25,10 @@
 | 2026-10-31 | 오늘의 질문은 독립 탭 X, **Home 주요 카드** | |
 | 2026-10-31 | Redis를 MVP부터 사용 | Guest 정책 때문 |
 | 2026-10-31 | 이슈 1개 = 브랜치 1개 = PR 1개 | 브랜치명 `type/#번호-설명` |
+| 2026-10-31 | Guest 만료는 **소켓별 타이머로 즉시 종료**, 30초 스케줄러는 보조 | CodeRabbit 리뷰(#18) |
+| 2026-10-31 | Guest→회원 전환 시 **본인 메시지만** 이전, 상대 Guest 메시지는 PG로 옮기지 않음 | CodeRabbit 리뷰(#18) |
+| 2026-10-31 | 1:1 매칭 후보는 **온라인 actor만** (오프라인 확장은 V2) | PRD와 일치 |
+| 2026-10-31 | progress.md 완료 반영은 **다음 이슈 PR 첫 커밋**에서 | main 직접 push 금지 |
 | 2026-10-31 | **1인 개발** — 셀프 머지, 사람 리뷰 대신 CodeRabbit 자동 리뷰 | CONTRIBUTING.md §1 |
 | 2026-10-31 | 이슈·커밋·PR 제목은 **`[TYPE]` 대문자 대괄호** 형식 | 예: `[FEAT] #5 Guest 세션 발급 API 추가`. 브랜치만 소문자 |
 
@@ -39,5 +43,6 @@
 
 ## 📝 작업 메모
 - 기존 뼈대(TasteMate, 음식 취향 앱 기준)는 `main` 첫 커밋에 남아 있음 — 참고용
+- ⚠️ **현재 코드는 아직 목표 설계와 다름**: `routes/auth.js`의 Guest는 PostgreSQL `users`에 저장되고 24시간 JWT를 씀. Redis 기반 30분 Guest는 #5·#12에서 구현
 - `src/backend/.env`는 git 제외됨. 새 환경에서는 `.env.example` 복사
 - GitHub 이슈 #17(My Orbit) 아직 미등록

@@ -15,7 +15,7 @@
 | DB | PostgreSQL 16 | 회원, 취향, 라운지, 채팅방, 회원 메시지, 질문 |
 | Cache/임시 저장 | Redis | **Guest 세션·Guest 데이터(TTL)**, 온라인 상태, Rate Limit, (확장 시) Socket.io adapter |
 | Auth | JWT + bcrypt | 회원 인증 토큰, 비밀번호 해싱 |
-| Client 토큰 저장 | Expo SecureStore (앱) / HttpOnly 쿠키 또는 localStorage (웹) | 회원 JWT, Guest 세션 토큰 |
+| Client 토큰 저장 | **iOS·Android:** Expo SecureStore / **Web:** 미결정(HttpOnly 쿠키 vs localStorage, #5에서 결정) | 회원 JWT, Guest 세션 토큰 |
 
 > 기획 초안에서는 "Redis는 나중에 도입해도 됨"이었지만, **Guest 데이터를 PostgreSQL에 남기지 않는다는 정책** 때문에 MVP부터 Redis를 사용한다.
 
@@ -70,7 +70,7 @@ sequenceDiagram
     A->>B: POST /api/guest/session
     B->>R: SET guest:session:{token} {guestId, nickname, avatar, expiresAt} EX 1800
     B-->>A: guestToken, nickname, avatar, expiresAt
-    A->>A: SecureStore에 guestToken 저장, 카운트다운 시작
+    A->>A: guestToken 저장(앱: SecureStore), 카운트다운 시작
 
     A->>B: (모든 요청) X-Guest-Token
     B->>R: 세션 조회 + expiresAt 검증
@@ -78,11 +78,14 @@ sequenceDiagram
         B-->>A: 401 GUEST_EXPIRED
     end
 
-    Note over B: 만료 스케줄러 (매 30초)
-    B->>B: 만료된 guest 소켓 강제 disconnect
-    B->>R: guest:* 키 삭제 (TTL 보조)
+    Note over B: expiresAt 도달 (소켓별 만료 타이머)
     B-->>A: socket 'guest:expired'
+    B->>B: 해당 guest 소켓 disconnect + 방 퇴장 브로드캐스트
+    B->>R: guest:* 키 삭제
     A->>A: 로컬 토큰 삭제 → Welcome 이동
+
+    Note over B: 보조 스케줄러 (매 30초)
+    B->>B: 타이머에서 누락된 만료 소켓·키 정리
 ```
 
 ### 4-1. Redis 키 설계 (Guest)
@@ -99,6 +102,9 @@ sequenceDiagram
 ### 4-2. 원칙
 - **절대 시간제**: `expiresAt = createdAt + 30분`, 갱신하지 않는다.
 - **TTL에만 의존하지 않는다**: 모든 HTTP 요청·소켓 이벤트에서 `expiresAt`을 서버가 직접 확인.
+- **만료 시점에 즉시 종료한다**: Guest 소켓이 연결되면 `expiresAt - now` 후에 실행되는 만료 타이머를 등록한다. 타이머는 `guest:expired` 이벤트를 **먼저 보낸 뒤** 연결을 끊는다(끊은 뒤에는 이벤트를 받을 수 없음).
+- **30초 스케줄러는 보조 수단**이다. 서버 재시작 등으로 타이머가 누락된 소켓과 Redis 키만 정리한다.
+- **수신자도 확인한다**: 방에 메시지를 브로드캐스트할 때 수신자 중 만료된 Guest 소켓은 제외(그리고 즉시 종료)한다.
 - **로그 금지**: Guest 메시지 본문은 console/에러 로그/분석 이벤트에 남기지 않는다. 로거에서 `content` 필드 마스킹.
 - 신고 시에만 해당 메시지 스냅샷을 `reports`에 저장 (예외).
 
@@ -118,7 +124,9 @@ sequenceDiagram
    - users 생성
    - `guest:tastes` → `user_tastes` INSERT
    - `guest:rooms`의 방 → `chat_members`의 actor를 member로 교체, 방의 `is_temporary=false`
-   - `room:{id}:guestmsgs` 중 해당 Guest가 속한 방의 메시지 → `messages` INSERT (sender를 새 userId로)
+   - `room:{id}:guestmsgs`에서 **가입한 Guest 본인이 보낸 메시지만** → `messages` INSERT (sender = 새 userId)
+   - 같은 방의 **Member 메시지**는 원래 작성자(sender_id)를 그대로 유지한다 (이미 PG에 있으면 그대로, Redis에 있으면 원 작성자로 INSERT)
+   - **다른 Guest(가입하지 않은 상대)의 메시지는 PostgreSQL로 이전하지 않는다** — Guest 메시지 보관 정책 유지. 해당 Guest 만료 시 Redis에서 삭제
    - `guest:answers` → `question_answers` INSERT
 3. Redis guest 키 삭제, 소켓 재인증(`auth:upgrade` 이벤트)
 4. 상대방 화면에서는 닉네임·캐릭터가 그대로 유지됨 (가입 시 Guest 닉네임 유지 옵션 기본 ON)
@@ -150,7 +158,8 @@ similarity(A, B) = Σ(A_i * B_i) / (‖A‖ * ‖B‖)
 1. 후보군: 현재 온라인 actor (Redis `online:actors`) 중 본인 제외
 2. 제외: 차단 관계(양방향), 이미 활성 1:1 방이 있는 상대, 최근 거절한 상대(24h)
 3. 유사도 상위 N명(기본 10) + 공통 태그 상위 3개 반환
-4. 후보가 부족하면 오프라인 Member까지 확장 (요청은 대기 상태로)
+4. 후보가 부족하면 빈 목록 + "지금은 비슷한 사람이 없어요, 라운지를 둘러보세요" 안내 (PRD §3-2: **현재 접속 중인 Member·Guest만** 대상)
+   - 오프라인 Member 확장은 V2 검토 항목
 
 ## 7. 디렉토리 구조 (목표, #2에서 적용)
 

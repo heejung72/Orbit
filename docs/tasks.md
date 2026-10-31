@@ -84,7 +84,8 @@
 - [ ] `POST /guest/session` — 랜덤 닉네임("형용사 + 명사", 예: 익명의 여행자) + 기본 캐릭터 + `expiresAt = now+30m`
 - [ ] Redis 키 저장 ([system_design.md §4-1](./system_design.md))
 - [ ] `guestAuth` 미들웨어, `optionalAuth`에 Guest 지원 추가
-- [ ] 만료 시 `401 GUEST_EXPIRED`
+- [ ] `guestAuth`가 **모든 HTTP 요청마다** `expiresAt`을 직접 검사 → 지났으면 `401 GUEST_EXPIRED` (TTL에만 의존 X)
+- [ ] 기존 `routes/auth.js`의 PG 기반 Guest(24h JWT) 제거
 - [ ] 앱: guestToken SecureStore 저장, `AuthContext`에 actor 타입 반영
 - [ ] GuestEntry 화면 (발급된 닉네임·캐릭터, "30분 동안 머물 수 있어요" 안내)
 
@@ -113,7 +114,8 @@
 - [ ] 각 탭 placeholder 화면 연결
 
 ## #10 [FEAT] Socket.io 실시간 채팅 기반
-- [ ] 소켓 인증 (JWT / guestToken)
+- [ ] 소켓 인증 (JWT / guestToken) — 연결 시 + **모든 이벤트 처리 전** Guest `expiresAt` 검사, 지났으면 `guest:expired` 전송 후 disconnect
+- [ ] 브로드캐스트 시 만료된 Guest 수신자 제외
 - [ ] 이벤트: `room:join`, `room:leave`, `message:send`, `message:new`, `typing` ([system_design.md §5](./system_design.md))
 - [ ] 저장 규칙: Member→PG, Guest 관련→Redis ([§4-3](./system_design.md))
 - [ ] 로거 마스킹 (Guest 메시지 본문 로그 금지)
@@ -129,13 +131,14 @@
 
 ## #12 [FEAT] Guest Time Attack
 - [ ] `GuestTimer` 컴포넌트 (mm:ss, 5분 이하 강조색)
-- [ ] 서버 만료 스케줄러 `jobs/guestExpiry.js` (30초 주기): 소켓 강제 종료, Redis 정리, 방 퇴장 브로드캐스트
+- [ ] 소켓별 만료 타이머 (`expiresAt - now`): `guest:expired` **전송 후** disconnect → 방 퇴장 브로드캐스트 → Redis 정리
+- [ ] 보조 스케줄러 `jobs/guestExpiry.js` (30초 주기): 타이머에서 누락된 소켓·키 정리
 - [ ] `guest:warning`(5분 전), `guest:expired` 이벤트
 - [ ] 앱: 만료 시 토큰 삭제 → "궤도가 사라졌어요" 화면 → Welcome
 - [ ] 앱이 백그라운드였다가 돌아와도 `expiresAt` 기준으로 정확히 계산
 
 ## #13 [FEAT] 1:1 취향 매칭
-- [ ] `services/matching` 가중치 코사인 유사도 + 제외 규칙 ([system_design.md §6](./system_design.md))
+- [ ] `services/matching` 가중치 코사인 유사도 + 제외 규칙 ([system_design.md §6](./system_design.md)) — 후보는 온라인 actor만
 - [ ] `GET /matching/candidates`, 요청/수락/거절 API + `match:request`/`match:accepted` 이벤트
 - [ ] Matching 화면 (상대 캐릭터, 닉네임, 공통 취향 3개, [대화 요청])
 - [ ] 수락 시 1:1 방 생성 (Guest 포함 시 `is_temporary=true`)
@@ -144,7 +147,7 @@
 ## #14 [FEAT] Guest → 회원 전환
 - [ ] `SignupNudgeModal` (3가지 트리거: 기록 저장 버튼 / 만료 5분 전 / 메시지 20개)
 - [ ] Register에 `X-Guest-Token` 전달
-- [ ] `services/migration` 트랜잭션 ([system_design.md §4-4](./system_design.md)): 취향·방·메시지·답변 이전
+- [ ] `services/migration` 트랜잭션 ([system_design.md §4-4](./system_design.md)): 취향·방·답변 이전, 메시지는 **본인 것만** 새 userId로, Member 메시지 작성자 유지, 상대 Guest 메시지는 이전 X
 - [ ] 소켓 재인증 `auth:upgrade`, 상대 화면 닉네임 유지
 - [ ] 상대도 Guest인 방의 처리 방식 결정 후 문서 반영
 
