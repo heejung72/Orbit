@@ -9,6 +9,20 @@ import { api, setOnSessionExpired } from './services/api';
 export default function App() {
   // authState: 'loading' | 'loggedOut' | 'guest' | 'member'
   const [authState, setAuthState] = useState('loading');
+  const [needsTaste, setNeedsTaste] = useState(false);
+
+  // 서버에서 현재 사용자를 확인해 들어갈 곳을 정한다 (앱 시작·로그인·가입·둘러보기 직후)
+  // 401이면 request()가 세션을 지우고 onSessionExpired로 loggedOut 처리, 네트워크 오류면 저장된 상태(fallback)로 진행
+  const enter = async (fallback) => {
+    try {
+      const me = await api.me();
+      setNeedsTaste(me.type === 'member' && !me.has_tastes); // Guest 취향 온보딩은 #7
+      setAuthState(me.type);
+    } catch (err) {
+      if (err.code === 'UNAUTHORIZED' || err.code === 'GUEST_EXPIRED') return;
+      setAuthState(fallback);
+    }
+  };
 
   useEffect(() => {
     setOnSessionExpired(() => setAuthState('loggedOut'));
@@ -26,14 +40,7 @@ export default function App() {
         console.warn('세션 확인 실패:', err.message); // 저장소 오류여도 로그인 화면은 보여준다
         return setAuthState('loggedOut');
       }
-      // 서버에서 계정·세션이 사라졌는지 확인 (DB 초기화, Redis 정리 등)
-      // 401이면 request()가 세션을 지우고 onSessionExpired로 loggedOut 처리, 네트워크 오류면 그대로 진행
-      try {
-        await api.me();
-      } catch (err) {
-        if (err.code === 'UNAUTHORIZED' || err.code === 'GUEST_EXPIRED') return;
-      }
-      setAuthState(isMember ? 'member' : 'guest');
+      await enter(isMember ? 'member' : 'guest'); // DB 초기화·Redis 정리로 사라진 계정·세션도 여기서 걸러짐
     })();
   }, []);
 
@@ -47,8 +54,9 @@ export default function App() {
       <RootNavigator
         isLoggedIn={isLoggedIn}
         isGuest={isGuest}
-        onLogin={() => setAuthState('member')}
-        onGuestLogin={() => setAuthState('guest')}
+        needsTaste={needsTaste}
+        onLogin={() => enter('member')}
+        onGuestLogin={() => enter('guest')}
         onLogout={() => setAuthState('loggedOut')}
       />
     </NavigationContainer>
