@@ -5,7 +5,7 @@
 > - 인증: `M` = memberAuth, `G` = guestAuth, `O` = optionalAuth(회원·Guest), `-` = 없음
 > - 에러 형식: `{ "error": "사용자에게 보여줄 메시지", "code": "GUEST_EXPIRED" }` (`code`는 클라이언트가 분기해야 할 때만)
 > - Guest 인증 헤더: `X-Guest-Token: <guestToken>` (회원은 `Authorization: Bearer <JWT>`, 둘 다 있으면 회원 우선)
-> - ⚠️ #3 시점 실제 구현은 이전 경로를 유지합니다 (`PUT /users/me/tastes` body `{ tags: [{tagId, weight}] }`, `POST /matching/find`, `POST /matching/request/:targetId` 등). 각 기능 이슈에서 아래 명세로 교체합니다.
+> - ⚠️ #3 시점 실제 구현은 이전 경로를 유지합니다 (`POST /matching/find`, `POST /matching/request/:targetId` 등). 각 기능 이슈에서 아래 명세로 교체합니다.
 
 ## 공통 에러 코드
 | code | HTTP | 설명 |
@@ -23,7 +23,7 @@
 |---|---|---|---|
 | POST | `/auth/register` | - (선택: `X-Guest-Token`) | `{email, password(8자~72바이트), nickname(2~12자), avatar_id?}` → `201 {token, user:{nickname, avatar_id}}`. 이메일은 소문자 저장, 중복 409, 없는 캐릭터 400. Guest 데이터 이전은 #14 |
 | POST | `/auth/login` | - | `{email, password}` → `{token, user}` (이메일 대소문자 무시), 실패 401, 정지 403 |
-| GET | `/auth/me` | O | `{type: 'member' \| 'guest', nickname, avatar_id, avatar_emoji, has_tastes?(회원), expires_at?(Guest)}` |
+| GET | `/auth/me` | O | `{type: 'member' \| 'guest', nickname, avatar_id, avatar_emoji, has_tastes, expires_at?(Guest)}` |
 
 ## Guest — #5
 | Method | Path | 인증 | 설명 |
@@ -41,9 +41,14 @@
 ## Tastes — #7
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
-| GET | `/tastes/categories` | - | 카테고리 + 태그 목록 |
-| GET | `/tastes/me` | O | 내 취향 |
-| PUT | `/tastes/me` | O | 내 취향 저장 `[{tagId, weight}]` (Guest는 Redis) |
+| GET | `/tastes/categories` | O | `[{ id, code, name, icon, tags: [{ id, name }] }]` |
+| GET | `/tastes/me` | O | `[{ tag_id, name, category_id, category, weight }]` (카테고리·태그 순서) |
+| PUT | `/tastes/me` | O | body `{ tags: [{ tagId, weight }] }` → 전체 교체 후 `GET /tastes/me`와 같은 목록 |
+
+- 규칙: **3~20개**, `weight` 정수 1~3 (3 매우 좋아함 / 2 좋아함 / 1 관심 있음), `tagId` 중복 불가
+- 400: 개수·형식·중복 위반, 존재하지 않는 태그 / 401: 토큰 없음·만료 / 503 `UNAVAILABLE`: Guest 요청인데 Redis 연결 끊김
+- 저장 위치: 회원 `user_tastes`(트랜잭션 교체) / Guest Redis `guest:tastes:{guestId}` (세션 `expiresAt`에 함께 만료)
+- `/auth/me`의 `has_tastes`는 회원·Guest 모두 내려준다 (0개면 앱이 TasteSelect부터 보여줌)
 
 ## Home — #8
 | Method | Path | 인증 | 설명 |
