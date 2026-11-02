@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
 const optionalAuth = require('../middleware/optionalAuth');
+const { guestHasTastes } = require('../services/tastes');
 
 const router = express.Router();
 
@@ -88,11 +89,18 @@ router.post('/login', async (req, res) => {
 
 // 현재 사용자 (회원·Guest 공통). Guest는 남은 시간 계산용 expiresAt 포함
 router.get('/me', optionalAuth, async (req, res) => {
-  if (req.isGuest) {
-    const { nickname, avatarId, avatarEmoji, expiresAt } = req.guest;
-    return res.json({ type: 'guest', nickname, avatar_id: avatarId, avatar_emoji: avatarEmoji, expires_at: new Date(expiresAt).toISOString() });
-  }
   try {
+    if (req.isGuest) {
+      const { guestId, nickname, avatarId, avatarEmoji, expiresAt } = req.guest;
+      return res.json({
+        type: 'guest',
+        nickname,
+        avatar_id: avatarId,
+        avatar_emoji: avatarEmoji,
+        expires_at: new Date(expiresAt).toISOString(),
+        has_tastes: await guestHasTastes(guestId),
+      });
+    }
     const { rows } = await db.query(
       `SELECT u.nickname, u.avatar_id, a.emoji AS avatar_emoji,
               EXISTS (SELECT 1 FROM user_tastes ut WHERE ut.user_id = u.id) AS has_tastes
@@ -102,6 +110,7 @@ router.get('/me', optionalAuth, async (req, res) => {
     if (rows.length === 0) return res.status(401).json({ error: '유효하지 않은 토큰입니다', code: 'UNAUTHORIZED' });
     res.json({ type: 'member', ...rows[0] });
   } catch (err) {
+    if (err.code === 'REDIS_UNAVAILABLE') return res.status(503).json({ error: '잠시 후 다시 시도해주세요', code: 'UNAVAILABLE' });
     res.status(500).json({ error: '서버 오류가 발생했습니다' });
   }
 });

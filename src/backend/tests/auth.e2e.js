@@ -93,7 +93,7 @@ const check = async (name, fn) => {
     await check('취향 저장 후 has_tastes true (Welcome → 취향 온보딩 분기)', async () => {
       const auth = { Authorization: 'Bearer ' + token };
       const tags = (await call('GET', '/tastes/categories', undefined, auth)).j[0].tags.slice(0, 3);
-      const put = await call('PUT', '/users/me/tastes', { tags: tags.map((t) => ({ tagId: t.id, weight: 2 })) }, auth);
+      const put = await call('PUT', '/tastes/me', { tags: tags.map((t) => ({ tagId: t.id, weight: 2 })) }, auth);
       assert.strictEqual(put.s, 200);
       assert.strictEqual((await call('GET', '/auth/me', undefined, auth)).j.has_tastes, true);
     });
