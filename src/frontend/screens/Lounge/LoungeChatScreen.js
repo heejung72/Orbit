@@ -40,7 +40,7 @@ export default function LoungeChatScreen({ route, navigation }) {
         <TouchableOpacity
           style={[styles.chatButton, !lounge.chat_room_id && styles.chatButtonDisabled]}
           disabled={!lounge.chat_room_id}
-          onPress={() => navigation.navigate('ChatRoom', { roomId: lounge.chat_room_id, title: lounge.name })}
+          onPress={() => navigation.navigate('ChatRoom', { roomId: lounge.chat_room_id, title: lounge.name, type: 'lounge' })}
         >
           <Text style={styles.chatText}>{lounge.chat_room_id ? '그룹 채팅' : '채팅 준비 중'}</Text>
         </TouchableOpacity>

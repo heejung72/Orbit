@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import RootNavigator from './navigation/RootNavigator';
 import { secureStorage, clearSession } from './services/storage';
 import { api, setOnSessionExpired } from './services/api';
+import { connectSocket, disconnectSocket } from './services/socket';
 import { colors, spacing, typography } from './theme';
 
 export default function App() {
@@ -54,6 +55,20 @@ export default function App() {
       await enter(); // DB 초기화·Redis 정리로 사라진 계정·세션도 여기서 걸러짐
     })();
   }, []);
+
+  // 로그인·둘러보기 중에만 실시간 소켓 연결. Guest 만료(guest:expired)·인증 거절이면 세션 정리 후 Welcome
+  useEffect(() => {
+    if (authState === 'member' || authState === 'guest') {
+      connectSocket({
+        onSessionExpired: async () => {
+          await clearSession();
+          setAuthState('loggedOut');
+        },
+      });
+    } else if (authState === 'loggedOut') {
+      disconnectSocket();
+    }
+  }, [authState]);
 
   if (authState === 'loading') return null;
   if (authState === 'offline') {

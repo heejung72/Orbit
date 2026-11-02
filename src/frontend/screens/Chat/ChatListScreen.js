@@ -21,6 +21,7 @@ export default function ChatListScreen({ navigation }) {
       onPress={() => navigation.navigate('ChatRoom', {
         roomId: item.id,
         title: tab === 'direct' ? item.partner_nickname : item.lounge_name,
+        type: tab === 'direct' ? 'direct' : 'lounge',
       })}
     >
       <View style={styles.avatar}>

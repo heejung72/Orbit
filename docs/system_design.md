@@ -95,7 +95,7 @@ sequenceDiagram
 | `guest:id:{guestId}` | String | 세션 키 (역조회, 강제 종료용) | 동일 (#12에서 추가) |
 | `guest:tastes:{guestId}` | Hash | tagId → weight (저장 시 DEL+HSET+PEXPIREAT를 MULTI로, `DELETE /guest/session` 시 함께 삭제) | 동일 (#7) |
 | `guest:rooms:{guestId}` | Set | 참여 중인 roomId | 동일 |
-| `room:{roomId}:guestmsgs` | List | Guest가 포함된 1:1 방 / 라운지의 Guest 메시지 JSON | 해당 guest 만료 시 정리 |
+| `room:{roomId}:guestmsgs` | List | Guest 메시지 JSON(작성자 `guestId`·`expiresAt` 포함, 최근 500개). 읽을 때 만료된 작성자 메시지 제외 (#10) | 마지막 Guest 메시지 후 30분. 만료 즉시 삭제는 #12 |
 | `guest:answers:{guestId}` | Hash | questionId → 답변 | 동일 |
 | `guest:msgcount:{guestId}` | String | 보낸 메시지 수 (가입 유도 트리거) | 동일 |
 
@@ -136,19 +136,23 @@ sequenceDiagram
 
 ## 5. 실시간(Socket.io) 이벤트
 
+- **연결 인증**: `auth.token`(회원 JWT) 또는 `auth.guestToken`(Guest). 거절 시 `connect_error`의 `data.code` = `UNAUTHORIZED` / `GUEST_EXPIRED` / `UNAVAILABLE`
+- **Guest는 모든 이벤트 처리 전** 세션을 다시 확인하고, 만료(시간·직접 종료)면 `guest:expired`를 보낸 뒤 연결을 끊는다 (#10). 소켓별 만료 타이머·5분 전 알림은 #12
+- **결과·오류는 ack 콜백** `{ ok: true, ... }` / `{ ok: false, code, message }` (`ROOM_NOT_FOUND`, `ROOM_CLOSED`, `INVALID_MESSAGE`, `UNAVAILABLE`, `SERVER_ERROR`)
+
 | 방향 | 이벤트 | payload | 설명 |
 |---|---|---|---|
-| C→S | `room:join` | `{roomId}` | 1:1 방 또는 라운지 입장 |
-| C→S | `room:leave` | `{roomId}` | 퇴장 |
-| C→S | `message:send` | `{roomId, content, clientId}` | 메시지 전송 (필터·Rate Limit 적용) |
-| C→S | `typing` | `{roomId}` | 입력 중 |
-| S→C | `message:new` | `{id, roomId, sender:{displayName, avatarId}, content, createdAt}` | 새 메시지 |
-| S→C | `room:presence` | `{roomId, count}` | 라운지 참여 인원 |
-| S→C | `match:request` / `match:accepted` | `{matchId, ...}` | 매칭 |
-| S→C | `guest:warning` | `{remainingSec: 300}` | 만료 5분 전 (가입 유도) |
-| S→C | `guest:expired` | `{}` | 만료, 서버가 연결 종료 |
-| S→C | `signup:nudge` | `{reason}` | 메시지 수 기준 가입 유도 |
-| S→C | `error` | `{code, message}` | `RATE_LIMITED`, `BLOCKED_WORD` 등 |
+| C→S | `room:join` | `{roomId}` → ack | 1:1(참여 회원만) 또는 라운지(회원·Guest) 입장 (#10) |
+| C→S | `room:leave` | `{roomId}` | 소켓만 방에서 나감 (1:1 방 나가기는 REST `POST /chat/rooms/:id/leave`) |
+| C→S | `message:send` | `{roomId, content}` → ack `{ok, id}` | 1~1000자, 비속어 가림, 회원 PG / Guest Redis 저장 (#10). Rate Limit #16 |
+| C→S | `typing` | `{roomId}` | 입력 중 (같은 방의 다른 소켓에게 `typing {roomId}`) |
+| S→C | `message:new` | `{id, room_id, content, created_at, is_mine, is_guest, sender_nickname, sender_avatar_emoji}` | 새 메시지. `is_mine`은 받는 소켓마다 계산, 만료된 Guest 수신자는 받지 않고 종료 |
+| S→C | `typing` | `{roomId}` | 상대 입력 중 |
+| S→C | `guest:expired` | `{}` | 만료, 서버가 연결 종료 (#10 이벤트 시점, #12 타이머) |
+| S→C | `room:presence` | `{roomId, count}` | 라운지 참여 인원 (#11) |
+| S→C | `match:request` / `match:accepted` | `{matchId, ...}` | 매칭 (#13) |
+| S→C | `guest:warning` | `{remainingSec: 300}` | 만료 5분 전 (#12) |
+| S→C | `signup:nudge` | `{reason}` | 메시지 수 기준 가입 유도 (#14) |
 
 ## 6. 매칭 알고리즘 (#13)
 

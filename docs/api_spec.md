@@ -74,10 +74,13 @@
 ## Chat — #10
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
-| GET | `/chat/rooms` | O | 내 1:1 방 목록 |
-| GET | `/chat/rooms/:id/messages?before=` | O | 메시지 기록 |
-| POST | `/chat/rooms/:id/leave` | O | 방 나가기 |
-| GET | `/chat/rooms/:id/topics` | O | 공통 취향 기반 대화 주제 추천 |
+| GET | `/chat/rooms` | O | `{ direct: [...], lounges: [...] }` — 회원의 1:1·참여 라운지 방. Guest는 빈 목록(1:1 #13, 라운지 참여 #11) |
+| GET | `/chat/rooms/:id/messages?before=&limit=` | O | 회원(PG) + Guest(Redis) 메시지를 시간순 병합, 최대 100개. 형식은 소켓 `message:new`와 같음. 만료된 Guest의 메시지는 제외 |
+| POST | `/chat/rooms/:id/leave` | O | 1:1 방 나가기 (둘 다 나가면 `closed_at`). 라운지는 400 → 라운지 나가기는 #11 |
+| GET | `/chat/rooms/:id/topics` | O | 공통 취향 기반 대화 주제 추천 (#13) |
+
+- 접근: 1:1은 참여 중인 회원만, 라운지 방은 회원·Guest 모두. 접근할 수 없는 방은 404
+- 실시간 송수신은 Socket.io (`docs/system_design.md` §5)
 
 ## Matching — #13
 | Method | Path | 인증 | 설명 |

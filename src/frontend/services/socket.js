@@ -2,52 +2,57 @@ import { io } from 'socket.io-client';
 import config from '../config';
 import { secureStorage } from './storage';
 
-const SOCKET_URL = config.SOCKET_URL;
+// 실시간 채팅 소켓 (docs/system_design.md §5)
+// 로그인·둘러보기 상태가 되면 App이 connectSocket을, 로그아웃되면 disconnectSocket을 호출한다
+// 서버 응답은 ack { ok, code?, message? } — request()가 Promise로 바꿔준다
 
+const ACK_TIMEOUT_MS = 5000;
+const RETRY_MS = 3000;
 let socket = null;
 
-export async function connectSocket() {
+// 회원은 JWT, Guest는 guestToken으로 연결. 세션이 끝나면(guest:expired, 인증 거절) onSessionExpired 호출
+export async function connectSocket({ onSessionExpired } = {}) {
+  disconnectSocket();
   const token = await secureStorage.get('token');
-  if (!token) return null; // Guest 소켓은 #10
+  const guestToken = token ? null : await secureStorage.get('guestToken');
+  if (!token && !guestToken) return null;
 
-  socket = io(SOCKET_URL, {
-    auth: { token },
-    transports: ['websocket'],
+  const s = io(config.SOCKET_URL, { auth: token ? { token } : { guestToken }, transports: ['websocket'] });
+  s.on('guest:expired', () => onSessionExpired?.());
+  s.on('connect_error', (err) => {
+    const code = err.data?.code;
+    if (code === 'UNAUTHORIZED' || code === 'GUEST_EXPIRED') return onSessionExpired?.();
+    // 서버 미들웨어가 거절하면 자동 재연결이 멈추므로 잠시 뒤 직접 다시 시도
+    if (code) setTimeout(() => socket === s && s.connect(), RETRY_MS);
   });
-
-  socket.on('connect', () => console.log('Socket connected'));
-  socket.on('disconnect', () => console.log('Socket disconnected'));
-
-  return socket;
-}
-
-export function getSocket() {
-  return socket;
-}
-
-export function joinRoom(roomId) {
-  if (socket) socket.emit('join_room', roomId);
-}
-
-export function leaveRoom(roomId) {
-  if (socket) socket.emit('leave_room', roomId);
-}
-
-export function sendMessage(roomId, content, type = 'text') {
-  if (socket) socket.emit('send_message', { roomId, content, type });
-}
-
-export function onNewMessage(callback) {
-  if (socket) socket.on('new_message', callback);
-}
-
-export function offNewMessage(callback) {
-  if (socket) socket.off('new_message', callback);
+  socket = s;
+  return s;
 }
 
 export function disconnectSocket() {
-  if (socket) {
-    socket.disconnect();
-    socket = null;
+  if (!socket) return;
+  socket.removeAllListeners();
+  socket.disconnect();
+  socket = null;
+}
+
+async function request(event, payload) {
+  if (!socket) return { ok: false, code: 'NOT_CONNECTED', message: '연결 중이에요. 잠시 후 다시 시도해주세요' };
+  try {
+    return await socket.timeout(ACK_TIMEOUT_MS).emitWithAck(event, payload);
+  } catch {
+    return { ok: false, code: 'TIMEOUT', message: '응답이 없어요. 잠시 후 다시 시도해주세요' };
   }
+}
+
+export const joinRoom = (roomId) => request('room:join', { roomId });
+export const sendMessage = (roomId, content) => request('message:send', { roomId, content });
+export const leaveRoom = (roomId) => socket?.emit('room:leave', { roomId });
+export const sendTyping = (roomId) => socket?.emit('typing', { roomId });
+
+// 이벤트 구독, 해제 함수를 돌려준다 (message:new, typing, connect …)
+export function subscribe(event, handler) {
+  const s = socket;
+  s?.on(event, handler);
+  return () => s?.off(event, handler);
 }

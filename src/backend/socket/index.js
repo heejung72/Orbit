@@ -1,86 +1,109 @@
 const { verifyMemberToken } = require('../middleware/memberAuth');
-const db = require('../db');
-const { filterMessage, containsBadWords } = require('../middleware/profanityFilter');
-const { getRoomForMember } = require('../services/chatAccess');
+const { findGuestSession } = require('../services/guestSession');
+const { getRoomForActor } = require('../services/chatAccess');
+const { normalizeContent, saveMessage, toClient } = require('../services/chat');
 
-// Socket.io
-// TODO(#10): 이벤트 이름을 설계(room:join, message:send, message:new …)로 변경, Guest(Redis) 지원,
-//            모든 이벤트에서 Guest expiresAt 검사
-// TODO(#16): send_message 사용자 단위 Rate Limit (Redis)
+// Socket.io — docs/system_design.md §5
+// C→S: room:join · room:leave · message:send · typing  /  S→C: message:new · typing · guest:expired
+// 결과·오류는 ack 콜백 { ok, code?, message? } 로 돌려준다
+// 메시지 본문은 어떤 로그에도 남기지 않는다 (오류 로그는 err.message만)
+// TODO(#12): 소켓별 만료 타이머·5분 전 알림 / TODO(#16): message:send Rate Limit
+
+const authError = (code) => Object.assign(new Error(code), { data: { code } });
+const fail = (code, message) => ({ ok: false, code, message });
+const isExpiredGuest = (actor) => actor.type === 'guest' && !(actor.expiresAt > Date.now());
+
+// guest:expired를 먼저 보낸 뒤 연결을 끊는다 (끊은 뒤에는 이벤트를 받을 수 없음)
+function expire(socket) {
+  socket.emit('guest:expired', {});
+  socket.disconnect(true);
+}
+
+// 이벤트 핸들러 공통: payload 기본값, ack가 없어도 동작, 예외는 SERVER_ERROR
+const handle = (fn) => async (payload, ack) => {
+  const reply = typeof ack === 'function' ? ack : () => {};
+  try {
+    await fn(payload && typeof payload === 'object' ? payload : {}, reply);
+  } catch (err) {
+    console.error('socket 이벤트 처리 실패:', err.message);
+    reply(fail(err.code === 'REDIS_UNAVAILABLE' ? 'UNAVAILABLE' : 'SERVER_ERROR', '잠시 후 다시 시도해주세요'));
+  }
+};
+
 function setupSocket(io) {
-  // 인증: 회원 JWT만 허용 (Guest 소켓은 #10)
-  io.use((socket, next) => {
-    const token = socket.handshake.auth.token;
-    if (!token) return next(new Error('인증이 필요합니다'));
-    const userId = verifyMemberToken(token);
-    if (!userId) return next(new Error('유효하지 않은 토큰입니다'));
-    socket.userId = userId;
-    socket.data.userId = userId; // fetchSockets()에서 읽기 위해
-    next();
+  // 연결 인증: 회원 JWT(auth.token) 또는 Guest 토큰(auth.guestToken)
+  io.use(async (socket, next) => {
+    const { token, guestToken } = socket.handshake.auth || {};
+    try {
+      if (token) {
+        const userId = verifyMemberToken(token);
+        if (!userId) return next(authError('UNAUTHORIZED'));
+        socket.data.actor = { type: 'member', id: userId };
+        return next();
+      }
+      if (guestToken) {
+        const s = await findGuestSession(guestToken);
+        if (!s) return next(authError('GUEST_EXPIRED'));
+        socket.data.guestToken = guestToken;
+        socket.data.actor = { type: 'guest', id: s.guestId, nickname: s.nickname, avatarEmoji: s.avatarEmoji, expiresAt: s.expiresAt };
+        return next();
+      }
+      next(authError('UNAUTHORIZED'));
+    } catch (err) {
+      next(authError(err.code === 'REDIS_UNAVAILABLE' ? 'UNAVAILABLE' : 'SERVER_ERROR'));
+    }
   });
 
   io.on('connection', (socket) => {
-    // 채팅방 참가 — 접근 가능한 방만
-    socket.on('join_room', async (roomId) => {
+    const { actor } = socket.data;
+
+    // 모든 이벤트 처리 전 Guest 세션 재확인 (시간 만료·직접 종료·Redis 정리 모두 여기서 걸림)
+    socket.use(async (packet, next) => {
+      if (actor.type !== 'guest') return next();
+      const ack = typeof packet[packet.length - 1] === 'function' ? packet[packet.length - 1] : null;
       try {
-        const room = await getRoomForMember(roomId, socket.userId);
-        if (!room) return socket.emit('error', { message: '채팅방에 들어갈 수 없습니다' });
-        socket.join(room.id);
-      } catch {
-        socket.emit('error', { message: '채팅방에 들어갈 수 없습니다' });
+        if (isExpiredGuest(actor) || !(await findGuestSession(socket.data.guestToken))) return expire(socket);
+        next();
+      } catch (err) {
+        ack?.(fail('UNAVAILABLE', '잠시 후 다시 시도해주세요'));
       }
     });
 
-    socket.on('leave_room', (roomId) => {
-      socket.leave(roomId);
-    });
+    socket.on('room:join', handle(async ({ roomId }, reply) => {
+      const room = await getRoomForActor(roomId, actor);
+      if (!room) return reply(fail('ROOM_NOT_FOUND', '채팅방에 들어갈 수 없어요'));
+      socket.join(room.id);
+      reply({ ok: true });
+    }));
 
-    // 메시지 전송
-    socket.on('send_message', async (data) => {
-      const roomId = data && data.roomId;
-      const content = typeof data?.content === 'string' ? data.content.trim() : '';
-      if (!roomId || !content || content.length > 1000) {
-        return socket.emit('error', { message: '메시지를 확인해주세요' });
-      }
+    socket.on('room:leave', handle(async ({ roomId }, reply) => {
+      if (typeof roomId === 'string') socket.leave(roomId);
+      reply({ ok: true });
+    }));
 
-      try {
-        const room = await getRoomForMember(roomId, socket.userId);
-        if (!room || room.closed_at) return socket.emit('error', { message: '메시지를 보낼 수 없는 방입니다' });
+    socket.on('message:send', handle(async ({ roomId, content }, reply) => {
+      const text = normalizeContent(content);
+      if (!text) return reply(fail('INVALID_MESSAGE', '메시지는 1~1000자로 입력해주세요'));
+      const room = await getRoomForActor(roomId, actor);
+      if (!room) return reply(fail('ROOM_NOT_FOUND', '메시지를 보낼 수 없는 방이에요'));
+      if (room.closed_at) return reply(fail('ROOM_CLOSED', '종료된 대화예요'));
 
-        const filtered = containsBadWords(content) ? filterMessage(content) : content;
-        const { rows } = await db.query(
-          `INSERT INTO messages (room_id, sender_id, content) VALUES ($1, $2, $3)
-           RETURNING id, created_at`,
-          [room.id, socket.userId, filtered]
-        );
-        const sender = await db.query(
-          `SELECT COALESCE(cm.display_name, u.nickname) AS nickname
-           FROM users u LEFT JOIN chat_members cm ON cm.room_id = $1 AND cm.user_id = u.id
-           WHERE u.id = $2`,
-          [room.id, socket.userId]
-        );
-
-        // 실제 user_id 대신 is_mine: 보낸 사람에게는 true, 나머지에게는 false
-        const message = {
-          id: rows[0].id,
-          room_id: room.id,
-          sender_nickname: sender.rows[0]?.nickname,
-          is_guest: false,
-          content: filtered,
-          created_at: rows[0].created_at,
-        };
-        // 같은 회원의 다른 기기에서도 내 메시지로 보이도록 소켓마다 비교
-        for (const s of await io.in(room.id).fetchSockets()) {
-          s.emit('new_message', { ...message, is_mine: s.data.userId === socket.userId });
+      const message = await saveMessage(room, actor, text);
+      // 받는 소켓마다 is_mine 계산, 만료된 Guest 수신자는 받지 않고 종료
+      for (const s of await io.in(room.id).fetchSockets()) {
+        if (isExpiredGuest(s.data.actor)) {
+          s.emit('guest:expired', {});
+          s.disconnect(true);
+          continue;
         }
-      } catch {
-        socket.emit('error', { message: '메시지 전송에 실패했습니다' });
+        s.emit('message:new', toClient(message, s.data.actor));
       }
-    });
+      reply({ ok: true, id: message.id });
+    }));
 
-    socket.on('typing', (roomId) => {
-      if (socket.rooms.has(roomId)) socket.to(roomId).emit('user_typing', {});
-    });
+    socket.on('typing', handle(async ({ roomId }) => {
+      if (typeof roomId === 'string' && socket.rooms.has(roomId)) socket.to(roomId).emit('typing', { roomId });
+    }));
   });
 }
 

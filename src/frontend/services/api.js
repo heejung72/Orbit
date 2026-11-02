@@ -78,6 +78,7 @@ export const api = {
 
   // 채팅
   getChatRooms: () => request('/chat/rooms'),
+  leaveChatRoom: (roomId) => request(`/chat/rooms/${roomId}/leave`, { method: 'POST' }),
   getMessages: (roomId, before) =>
     request(`/chat/rooms/${roomId}/messages${before ? `?before=${before}` : ''}`),
 
