@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../../services/api';
 import { secureStorage } from '../../services/storage';
@@ -8,10 +8,12 @@ import { colors, spacing, radius, typography } from '../../theme';
 // 로그아웃 상태의 첫 화면: [회원가입] [로그인] [가입 없이 둘러보기]
 export default function WelcomeScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   // 가입 없이 둘러보기: Guest 발급 → 안내 화면(GuestEntry)
   const handleGuest = async () => {
     setLoading(true);
+    setError('');
     try {
       const data = await api.createGuestSession();
       await secureStorage.set('guestToken', data.guestToken);
@@ -22,7 +24,8 @@ export default function WelcomeScreen({ navigation }) {
       ]);
       navigation.navigate('GuestEntry', { nickname: data.nickname, avatarEmoji: data.avatarEmoji, expiresAt: data.expiresAt });
     } catch (err) {
-      Alert.alert('오류', err.message);
+      // Alert는 웹(react-native-web)에서 동작하지 않아 화면 안에 표시한다
+      setError(err.code ? err.message : '서버에 연결할 수 없어요. 잠시 후 다시 시도해주세요');
     } finally {
       setLoading(false);
     }
@@ -47,6 +50,7 @@ export default function WelcomeScreen({ navigation }) {
         <Text style={styles.guestText}>{loading ? '궤도를 만드는 중...' : '가입 없이 둘러보기'}</Text>
         <Text style={styles.guestSub}>30분 동안 머물 수 있어요</Text>
       </TouchableOpacity>
+      {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
     </View>
   );
 }
@@ -68,4 +72,5 @@ const styles = StyleSheet.create({
   guest: { alignItems: 'center', paddingVertical: spacing.md },
   guestText: { color: colors.text, fontSize: 15, fontWeight: '600', textDecorationLine: 'underline' },
   guestSub: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  error: { ...typography.caption, color: colors.primary, textAlign: 'center' },
 });
