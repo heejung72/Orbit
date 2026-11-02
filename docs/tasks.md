@@ -19,8 +19,8 @@
 | 8 | [FEAT] Orbit Dashboard (Home) | `feat/#8-dashboard` | 7 | ✅ |
 | 9 | [FEAT] 하단 탭 네비게이션 | - | - | 닫음 (탭 구조는 #2, 디자인은 #24, Guest My Orbit은 #17) |
 | 10 | [FEAT] Socket.io 실시간 채팅 기반 | `feat/#10-socket-chat` | 4, 5 | ✅ |
-| 11 | [FEAT] 취향 라운지 | `feat/#11-lounge` | 10 | 🟨 |
-| 12 | [FEAT] Guest Time Attack | `feat/#12-guest-time-attack` | 5, 10 | ⬜ |
+| 11 | [FEAT] 취향 라운지 | `feat/#11-lounge` | 10 | ✅ |
+| 12 | [FEAT] Guest Time Attack | `feat/#12-guest-time-attack` | 5, 10 | 🟨 |
 | 13 | [FEAT] 1:1 취향 매칭 | `feat/#13-matching` | 7, 10 | ⬜ |
 | 14 | [FEAT] Guest → 회원 전환 | `feat/#14-guest-upgrade` | 12, 13 | ⬜ |
 | 15 | [FEAT] 오늘의 질문 | `feat/#15-today-question` | 8, 13 | ⬜ |
@@ -233,12 +233,19 @@
 - 하지 않은 것: 라운지 만들기 → V2 / Home 추천 섹션 / Guest 참여 이전 → #14 / 라운지 신고·강퇴 → #16 / 우주 테마 → #24
 
 ## #12 [FEAT] Guest Time Attack
-- [ ] `GuestTimer` 컴포넌트 (mm:ss, 5분 이하 강조색)
-- [x] 소켓별 만료 타이머 (`expiresAt - now`): `guest:expired` **전송 후** disconnect → 방 인원 갱신 — #11(PR #28)에서 완료. 남은 것: 만료 시 Redis 데이터 즉시 정리
-- [ ] 보조 스케줄러 `jobs/guestExpiry.js` (30초 주기): 타이머에서 누락된 소켓·키 정리
-- [ ] `guest:warning`(5분 전), `guest:expired` 이벤트
-- [ ] 앱: 만료 시 토큰 삭제 → "궤도가 사라졌어요" 화면 → Welcome
-- [ ] 앱이 백그라운드였다가 돌아와도 `expiresAt` 기준으로 정확히 계산
+### Backend
+- [x] 소켓별 만료 타이머 — #11(PR #28)에서 완료
+- [x] 만료 5분 전 `guest:warning` (소켓 타이머, 연결 시 이미 5분 이하면 즉시 1회)
+- [x] `jobs/guestExpiry.js` 30초 정리 작업(서버 안 `setInterval`): 만료·세션 없어진 Guest 소켓 종료, 라운지 Sorted Set·라운지 Guest 메시지 만료 항목 제거(LREM)
+- [x] `npm run guest:expiry` 스크립트 제거, `.env.example`에 `GUEST_CLEANUP_INTERVAL_MS`
+- [x] `tests/guestExpiry.e2e.js` + `npm run test:guest-expiry` (4개)
+
+### Frontend
+- [x] `GuestTimer`(mm:ss, `expiresAt` 기준 매초 재계산, 5분 이하 `colors.danger`, 스크린리더는 분 단위) — Home 헤더·채팅방 상단
+- [x] `GuestWarningBanner`(5분 전, 닫기)
+- [x] `OrbitExpiredScreen` "궤도가 사라졌어요" → [회원가입] [처음으로]
+- [x] App `endSession(reason)`: 소켓 `guest:expired`·인증 거절 / HTTP `GUEST_EXPIRED` / 만료 시각 타이머 / 앱 복귀(`AppState`) / 앱 재실행 시 지난 세션 — 모두 같은 경로
+- 하지 않은 것: 가입 유도 모달 → #14 / Guest 1:1 방 정리 → #13 / 분산 스케줄러 → V2
 
 ## #13 [FEAT] 1:1 취향 매칭
 - [ ] `services/matching` 가중치 코사인 유사도 + 제외 규칙 ([system_design.md §6](./system_design.md)) — 후보는 온라인 actor만

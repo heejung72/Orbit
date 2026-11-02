@@ -3,10 +3,10 @@
 > **작업을 다시 시작할 때 이 파일부터 읽는다.** 작업이 끝날 때마다 갱신한다.
 
 ## 🔖 지금 상태
-- **현재 이슈:** #11 [FEAT] 취향 라운지 — `feat/#11-lounge`
+- **현재 이슈:** #12 [FEAT] Guest Time Attack — `feat/#12-guest-time-attack`
 - **상태:** 구현·셀프 리뷰 완료 → PR 리뷰
-- **다음 할 일:** #11 머지 → #12 Guest Time Attack (우주 테마 `style/#24-space-theme`는 기능 이슈 뒤로 보류)
-- **로컬 준비물:** PostgreSQL + Redis, `src/backend`에서 `npm install`(socket.io-client 추가됨), 테스트는 `npm run test:auth`, `test:guest`, `test:tastes`, `test:home`, `test:chat`, `test:lounges` (서버 실행 중)
+- **다음 할 일:** #12 머지 → #13 1:1 취향 매칭 → #14 Guest → 회원 전환 (우주 테마 `style/#24-space-theme`는 기능 이슈 뒤로 보류)
+- **로컬 준비물:** PostgreSQL + Redis, `src/backend`에서 `npm install`(socket.io-client 추가됨), 테스트는 `npm run test:auth`, `test:guest`, `test:tastes`, `test:home`, `test:chat`, `test:lounges`, `test:guest-expiry` (서버 실행 중, `GUEST_CLEANUP_INTERVAL_MS`를 줄이면 빨리 끝남)
 
 ## ✅ 완료한 이슈
 | # | 제목 | PR | 머지일 |
@@ -20,6 +20,7 @@
 | 7 | [FEAT] 취향 시스템 | #25 | 2026-11-02 |
 | 8 | [FEAT] Orbit Dashboard (Home) | #26 | 2026-11-02 |
 | 10 | [FEAT] Socket.io 실시간 채팅 기반 | #27 | 2026-11-03 |
+| 11 | [FEAT] 취향 라운지 | #28 | 2026-11-03 |
 
 ## 📌 결정 로그
 | 날짜 | 결정 | 근거/비고 |
@@ -81,6 +82,10 @@
 | 2026-11-03 | 라운지 추천 = 대표 태그 겹침 × 중요도 × 2 + 카테고리 점수, LoungeList 상단에 표시 | #11. Home 추천 섹션은 보류 |
 | 2026-11-03 | 라운지 전용 메시지 API(`/lounges/:id/messages`) 두지 않음 | `/chat/rooms/:id/messages`와 중복 |
 | 2026-11-03 | Guest 소켓별 만료 타이머를 #12에서 #11로 당김 | PR #28 CodeRabbit. 이벤트 없는 만료 Guest가 접속 인원에 남던 문제. #12에는 5분 전 알림·정리 스케줄러·카운트다운만 남음 |
+| 2026-11-03 | 정리 작업은 별도 스크립트 대신 **서버 안 setInterval**(30초) | #12. 단일 서버 MVP, 여러 인스턴스는 V2 |
+| 2026-11-03 | 라운지 Guest 메시지 정리는 LREM(값 단위 삭제) | 리스트를 다시 쓰면 그사이 들어온 메시지를 잃을 수 있음 |
+| 2026-11-03 | Guest 만료 감지 5경로(소켓·HTTP·만료 시각 타이머·앱 복귀·앱 재실행)를 `endSession('guest')` 하나로 | 어느 경로든 "궤도가 사라졌어요" 화면 |
+| 2026-11-03 | 테마에 `colors.danger` 추가 | 남은 시간 강조. 우주 테마(#24)에도 같은 이름 토큰 있음 |
 | 2026-11-02 | 태그별 이미지(앨범 커버 등)는 #7에서 제외 → 별도 이슈 | 공식 API URL + 출처 표시 방식으로 추후 |
 
 ## ❓ 미결정 사항

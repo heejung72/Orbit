@@ -105,7 +105,8 @@ sequenceDiagram
 - **절대 시간제**: `expiresAt = createdAt + 30분`, 갱신하지 않는다.
 - **TTL에만 의존하지 않는다**: 모든 HTTP 요청·소켓 이벤트에서 `expiresAt`을 서버가 직접 확인.
 - **만료 시점에 즉시 종료한다**: Guest 소켓이 연결되면 `expiresAt - now` 후에 실행되는 만료 타이머를 등록한다. 타이머는 `guest:expired` 이벤트를 **먼저 보낸 뒤** 연결을 끊는다(끊은 뒤에는 이벤트를 받을 수 없음).
-- **30초 스케줄러는 보조 수단**이다. 서버 재시작 등으로 타이머가 누락된 소켓과 Redis 키만 정리한다.
+- **30초 정리 작업은 보조 수단**이다 (`jobs/guestExpiry.js`, 서버 프로세스 안 `setInterval`, 주기 `GUEST_CLEANUP_INTERVAL_MS`). 만료됐거나 세션이 없어진(다른 기기에서 종료) Guest 소켓 종료, 라운지 Sorted Set의 만료 Guest 제거, 라운지 Guest 메시지 리스트에서 만료 작성자 메시지 제거(LREM — 동시에 들어오는 새 메시지를 잃지 않게 리스트를 다시 쓰지 않음). 세션·취향·참여 목록 키는 세션과 같은 시각의 TTL로 사라진다 (#12)
+- **만료 5분 전 `guest:warning`**: 소켓 타이머로 1회, 연결 시 이미 5분 이하면 바로 (#12). 앱은 배너, #14에서 가입 유도 모달
 - **수신자도 확인한다**: 방에 메시지를 브로드캐스트할 때 수신자 중 만료된 Guest 소켓은 제외(그리고 즉시 종료)한다.
 - **로그 금지**: Guest 메시지 본문은 console/에러 로그/분석 이벤트에 남기지 않는다. 로거에서 `content` 필드 마스킹.
 - 신고 시에만 해당 메시지 스냅샷을 `reports`에 저장 (예외).
@@ -139,7 +140,7 @@ sequenceDiagram
 ## 5. 실시간(Socket.io) 이벤트
 
 - **연결 인증**: `auth.token`(회원 JWT) 또는 `auth.guestToken`(Guest). 거절 시 `connect_error`의 `data.code` = `UNAUTHORIZED` / `GUEST_EXPIRED` / `UNAVAILABLE`
-- **Guest는 모든 이벤트 처리 전** 세션을 다시 확인하고, 만료(시간·직접 종료)면 `guest:expired`를 보낸 뒤 연결을 끊는다 (#10). 이벤트가 없어도 **소켓별 만료 타이머**가 `expiresAt`에 같은 처리를 한다 (#11, PR #28). 5분 전 알림·누락 소켓 정리 스케줄러는 #12
+- **Guest는 모든 이벤트 처리 전** 세션을 다시 확인하고, 만료(시간·직접 종료)면 `guest:expired`를 보낸 뒤 연결을 끊는다 (#10). 이벤트가 없어도 **소켓별 만료 타이머**가 `expiresAt`에 같은 처리를 한다 (#11, PR #28). 5분 전 알림·30초 정리 작업은 #12
 - **결과·오류는 ack 콜백** `{ ok: true, ... }` / `{ ok: false, code, message }` (`ROOM_NOT_FOUND`, `ROOM_CLOSED`, `INVALID_MESSAGE`, `UNAVAILABLE`, `SERVER_ERROR`)
 
 | 방향 | 이벤트 | payload | 설명 |
@@ -153,7 +154,7 @@ sequenceDiagram
 | S→C | `guest:expired` | `{}` | 만료, 서버가 연결 종료 (#10 이벤트 시점, #11 소켓 타이머) |
 | S→C | `room:presence` | `{roomId, count}` | 라운지 채팅방에 **지금 접속 중인 사람 수**(같은 사람 여러 기기는 1명). 입장·퇴장·연결 끊김 때 방 전체에 전송 (#11) |
 | S→C | `match:request` / `match:accepted` | `{matchId, ...}` | 매칭 (#13) |
-| S→C | `guest:warning` | `{remainingSec: 300}` | 만료 5분 전 (#12) |
+| S→C | `guest:warning` | `{remainingSec}` | 만료 5분 전 1회, 연결 시 이미 5분 이하면 바로 (#12) |
 | S→C | `signup:nudge` | `{reason}` | 메시지 수 기준 가입 유도 (#14) |
 
 ## 6. 매칭 알고리즘 (#13)
