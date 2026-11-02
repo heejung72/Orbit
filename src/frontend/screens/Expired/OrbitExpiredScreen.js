@@ -8,7 +8,7 @@ export default function OrbitExpiredScreen({ navigation }) {
     <View style={styles.container}>
       <Text style={styles.title} accessibilityRole="header">궤도가 사라졌어요</Text>
       <Text style={styles.body}>
-        30분 둘러보기가 끝나 임시 닉네임과 대화가 정리됐어요.{'\n'}가입하면 다음에도 대화를 이어갈 수 있어요.
+        30분 둘러보기가 끝나 임시 닉네임과 대화가 정리됐어요.{'\n'}가입하면 앞으로 나누는 대화를 기록으로 남길 수 있어요.
       </Text>
       <Pressable style={styles.primary} onPress={() => navigation.navigate('Register')} accessibilityRole="button">
         <Text style={styles.primaryText}>회원가입</Text>

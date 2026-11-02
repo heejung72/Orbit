@@ -10,7 +10,9 @@ const { guestMessagesKey } = require('../services/chat');
 // 3) 라운지 Guest 메시지 리스트에서 만료된 작성자의 메시지 제거 (회원 메시지는 PG라 영향 없음)
 // 세션·취향·참여 목록 키는 세션과 같은 시각의 TTL로 이미 사라진다
 
-const INTERVAL_MS = Number(process.env.GUEST_CLEANUP_INTERVAL_MS) || 30000;
+// 1ms ~ setInterval 최대값(2^31-1) 사이 정수만 허용. 음수·0·숫자가 아니면 기본 30초 (잘못된 값이 1ms 반복이 되지 않게)
+const configured = Number(process.env.GUEST_CLEANUP_INTERVAL_MS);
+const INTERVAL_MS = Number.isInteger(configured) && configured >= 1 && configured <= 2147483647 ? configured : 30000;
 
 async function cleanupSockets(io) {
   const now = Date.now();

@@ -17,13 +17,13 @@ export default function App() {
   const [needsTaste, setNeedsTaste] = useState(false);
   const [guestExpiresAt, setGuestExpiresAt] = useState(null); // Guest 세션 만료 시각(ms)
   const [orbitExpired, setOrbitExpired] = useState(false); // true면 로그아웃 화면 첫 장이 "궤도가 사라졌어요"
-  const [showWarning, setShowWarning] = useState(false); // 만료 5분 전 배너
+  const [warning, setWarning] = useState(null); // 만료 5분 전 배너 { remainingSec }
 
   // 세션 종료 공통. Guest 만료면 안내 화면, 회원 토큰 무효·로그아웃이면 Welcome
   // 경로: 소켓 guest:expired·인증 거절 / HTTP GUEST_EXPIRED·UNAUTHORIZED / 만료 시각 도달 / 앱 복귀 시 확인
   const endSession = useCallback(async (reason) => {
     await clearSession();
-    setShowWarning(false);
+    setWarning(null);
     setOrbitExpired(reason === 'guest');
     setAuthState('loggedOut');
   }, []);
@@ -74,7 +74,7 @@ export default function App() {
   // 로그인·둘러보기 중에만 실시간 소켓 연결. Guest 만료(guest:expired)·인증 거절이면 세션 정리 후 Welcome
   useEffect(() => {
     if (authState === 'member' || authState === 'guest') {
-      connectSocket({ onSessionExpired: endSession, onGuestWarning: () => setShowWarning(true) });
+      connectSocket({ onSessionExpired: endSession, onGuestWarning: (w) => setWarning(w || {}) });
     } else if (authState === 'loggedOut') {
       disconnectSocket();
     }
@@ -123,7 +123,7 @@ export default function App() {
           onLogout={() => endSession('member')}
         />
       </NavigationContainer>
-      {isGuest && showWarning && <GuestWarningBanner onClose={() => setShowWarning(false)} />}
+      {isGuest && warning && <GuestWarningBanner remainingSec={warning.remainingSec} onClose={() => setWarning(null)} />}
     </SafeAreaProvider>
   );
 }

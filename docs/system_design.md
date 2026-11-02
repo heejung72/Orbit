@@ -78,14 +78,18 @@ sequenceDiagram
         B-->>A: 401 GUEST_EXPIRED
     end
 
-    Note over B: expiresAt 도달 (소켓별 만료 타이머)
-    B-->>A: socket 'guest:expired'
-    B->>B: 해당 guest 소켓 disconnect + 방 퇴장 브로드캐스트
-    B->>R: guest:* 키 삭제
-    A->>A: 로컬 토큰 삭제 → Welcome 이동
+    Note over B: 만료 5분 전 (소켓 타이머)
+    B-->>A: socket 'guest:warning' {remainingSec}
 
-    Note over B: 보조 스케줄러 (매 30초)
-    B->>B: 타이머에서 누락된 만료 소켓·키 정리
+    Note over B,R: expiresAt 도달
+    R->>R: 세션·취향·참여 목록 키 TTL 만료 (같은 시각)
+    B-->>A: socket 'guest:expired' (소켓별 만료 타이머)
+    B->>B: 해당 guest 소켓 disconnect + 라운지 접속 인원 갱신
+    A->>A: 로컬 토큰 삭제 → "궤도가 사라졌어요" 화면
+
+    Note over B: 정리 작업 (매 30초, jobs/guestExpiry.js)
+    B->>B: 만료·세션 없어진 Guest 소켓 종료
+    B->>R: lounge:{id}:guests 만료 항목 제거, room:{id}:guestmsgs 만료 작성자 메시지 LREM
 ```
 
 ### 4-1. Redis 키 설계 (Guest)
@@ -97,7 +101,7 @@ sequenceDiagram
 | `guest:rooms:{guestId}` | Set | 참여 중인 1:1 roomId | 동일 (#13) |
 | `guest:lounges:{guestId}` | Set | 참여한 loungeId | 동일 (#11) |
 | `lounge:{loungeId}:guests` | Sorted Set | guestId, score = 세션 expiresAt. 인원 계산 시 score > now만 셈, 참여 때 만료분 정리 | 마지막 참여 후 30분 (#11) |
-| `room:{roomId}:guestmsgs` | List | Guest 메시지 JSON(작성자 `guestId`·`expiresAt` 포함, 최근 500개). 읽을 때 만료된 작성자 메시지 제외 (#10) | 마지막 Guest 메시지 후 30분. 만료 즉시 삭제는 #12 |
+| `room:{roomId}:guestmsgs` | List | Guest 메시지 JSON(작성자 `guestId`·`expiresAt` 포함, 최근 500개). 읽을 때 만료된 작성자 메시지 제외 (#10) | 마지막 Guest 메시지 후 30분. 만료 작성자 메시지는 30초 정리 작업이 제거 (#12) |
 | `guest:answers:{guestId}` | Hash | questionId → 답변 | 동일 |
 | `guest:msgcount:{guestId}` | String | 보낸 메시지 수 (가입 유도 트리거) | 동일 |
 

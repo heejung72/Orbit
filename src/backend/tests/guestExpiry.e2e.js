@@ -97,6 +97,8 @@ const check = async (name, fn) => {
       const s = await connect({ guestToken: g.guestToken });
       await emit(s, 'room:join', { roomId: room });
       const guestMsg = await emit(s, 'message:send', { roomId: room, content: `만료될 메시지 ${id}` });
+      assert.strictEqual(guestMsg.ok, true); // 저장이 실패해도 아래 '없음' 검사가 통과해 버리지 않도록 먼저 확인
+      assert.ok((await redis.lRange(`room:${room}:guestmsgs`, 0, -1)).some((raw) => JSON.parse(raw).id === guestMsg.id));
       const m = await connect({ token: reg.j.token });
       await emit(m, 'room:join', { roomId: room });
       await emit(m, 'message:send', { roomId: room, content: `남을 회원 메시지 ${id}` });
