@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, AccessibilityInfo } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../../services/api';
 import { secureStorage } from '../../services/storage';
@@ -25,7 +25,10 @@ export default function WelcomeScreen({ navigation }) {
       navigation.navigate('GuestEntry', { nickname: data.nickname, avatarEmoji: data.avatarEmoji, expiresAt: data.expiresAt });
     } catch (err) {
       // Alert는 웹(react-native-web)에서 동작하지 않아 화면 안에 표시한다
-      setError(err.code ? err.message : '서버에 연결할 수 없어요. 잠시 후 다시 시도해주세요');
+      const msg = err.code ? err.message : '서버에 연결할 수 없어요. 잠시 후 다시 시도해주세요';
+      setError(msg);
+      // 네이티브 스크린리더가 새 오류를 바로 읽도록 (웹은 accessibilityRole="alert"로 읽힘)
+      if (Platform.OS !== 'web') AccessibilityInfo.announceForAccessibility(msg);
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import RootNavigator from './navigation/RootNavigator';
 import { secureStorage, clearSession } from './services/storage';
 import { api, setOnSessionExpired } from './services/api';
-import { colors } from './theme';
+import { colors, spacing, typography } from './theme';
 
 export default function App() {
   // authState: 'loading' | 'offline' | 'loggedOut' | 'guest' | 'member'
@@ -16,14 +16,23 @@ export default function App() {
   // 서버에서 현재 사용자를 확인해 들어갈 곳을 정한다 (앱 시작·로그인·가입·둘러보기 직후)
   // 401이면 request()가 세션을 지우고 onSessionExpired로 loggedOut 처리.
   // 그 밖의 오류(네트워크 등)는 취향 여부를 알 수 없으니 진입을 보류하고 '다시 시도' 화면을 보여준다
+  const entering = useRef(false);
   const enter = async () => {
+    if (entering.current) return; // 재시도 연타 등으로 /auth/me가 겹쳐 늦게 온 실패가 상태를 덮어쓰지 않게
+    entering.current = true;
     try {
       const me = await api.me();
       setNeedsTaste(me.type === 'member' && !me.has_tastes); // Guest 취향 온보딩은 #7
       setAuthState(me.type);
     } catch (err) {
-      if (err.code === 'UNAUTHORIZED' || err.code === 'GUEST_EXPIRED') return;
+      if (err.code === 'UNAUTHORIZED' || err.code === 'GUEST_EXPIRED') {
+        // 토큰 없이 보낸 요청의 401은 api.js가 세션을 정리하지 않으므로 여기서 로그아웃 처리
+        await clearSession();
+        return setAuthState('loggedOut');
+      }
       setAuthState('offline');
+    } finally {
+      entering.current = false;
     }
   };
 
@@ -77,7 +86,7 @@ export default function App() {
 
 const styles = StyleSheet.create({
   offline: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
-  offlineText: { color: colors.text, fontSize: 15 },
-  retry: { marginTop: 16, paddingVertical: 10, paddingHorizontal: 24 },
-  retryText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
+  offlineText: { ...typography.body, color: colors.text },
+  retry: { marginTop: spacing.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg },
+  retryText: { ...typography.body, color: colors.primary },
 });
