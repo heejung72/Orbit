@@ -94,7 +94,9 @@ router.get('/me', optionalAuth, async (req, res) => {
   }
   try {
     const { rows } = await db.query(
-      `SELECT u.nickname, u.avatar_id, a.emoji AS avatar_emoji FROM users u JOIN avatars a ON a.id = u.avatar_id WHERE u.id = $1`,
+      `SELECT u.nickname, u.avatar_id, a.emoji AS avatar_emoji,
+              EXISTS (SELECT 1 FROM user_tastes ut WHERE ut.user_id = u.id) AS has_tastes
+       FROM users u JOIN avatars a ON a.id = u.avatar_id WHERE u.id = $1`,
       [req.userId]
     );
     if (rows.length === 0) return res.status(401).json({ error: '유효하지 않은 토큰입니다', code: 'UNAUTHORIZED' });

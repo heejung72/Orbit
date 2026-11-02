@@ -83,10 +83,19 @@ const check = async (name, fn) => {
       assert.strictEqual((await call('POST', '/auth/login')).s, 400);
     });
 
-    await check('가입 토큰으로 바로 /auth/me', async () => {
+    await check('가입 토큰으로 바로 /auth/me (취향 없음 → has_tastes false)', async () => {
       const m = await call('GET', '/auth/me', undefined, { Authorization: 'Bearer ' + token });
       assert.strictEqual(m.j.type, 'member');
       assert.strictEqual(m.j.nickname, '궤도여행자');
+      assert.strictEqual(m.j.has_tastes, false);
+    });
+
+    await check('취향 저장 후 has_tastes true (Welcome → 취향 온보딩 분기)', async () => {
+      const auth = { Authorization: 'Bearer ' + token };
+      const tags = (await call('GET', '/tastes/categories', undefined, auth)).j[0].tags.slice(0, 3);
+      const put = await call('PUT', '/users/me/tastes', { tags: tags.map((t) => ({ tagId: t.id, weight: 2 })) }, auth);
+      assert.strictEqual(put.s, 200);
+      assert.strictEqual((await call('GET', '/auth/me', undefined, auth)).j.has_tastes, true);
     });
 
     await check('무효 토큰 → 401 UNAUTHORIZED (앱이 로그인 화면으로 보냄)', async () => {

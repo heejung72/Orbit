@@ -1,6 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import WelcomeScreen from '../screens/Welcome/WelcomeScreen';
 import LoginScreen from '../screens/Auth/LoginScreen';
 import RegisterScreen from '../screens/Auth/RegisterScreen';
 import GuestEntryScreen from '../screens/GuestEntry/GuestEntryScreen';
@@ -12,15 +13,26 @@ import { colors } from '../theme';
 
 const Stack = createNativeStackNavigator();
 
-// 진입 분기(Welcome / Guest / Member)는 #6에서 Welcome 화면과 함께 정리합니다.
-export default function RootNavigator({ isLoggedIn, isGuest, onLogin, onGuestLogin, onLogout }) {
+// 로그아웃 상태 첫 화면 = Welcome / 로그인 상태 첫 화면 = Main (취향 0개 회원은 TasteSelect)
+// 그룹이 바뀔 때 목록의 첫 화면부터 시작하므로 순서로 진입 화면을 정한다
+export default function RootNavigator({ isLoggedIn, isGuest, needsTaste, onLogin, onGuestLogin, onLogout }) {
+  const main = (
+    <Stack.Screen key="Main" name="Main" options={{ headerShown: false }}>
+      {() => <MainTabs isGuest={isGuest} onLogout={onLogout} />}
+    </Stack.Screen>
+  );
+  const taste = (
+    <Stack.Screen key="TasteSelect" name="TasteSelect" component={TasteSelectScreen} options={{ title: '취향 선택' }} />
+  );
+
   return (
     <Stack.Navigator
       screenOptions={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: colors.onPrimary }}
     >
       {!isLoggedIn ? (
         <>
-          <Stack.Screen name="Login" options={{ headerShown: false }}>
+          <Stack.Screen name="Welcome" component={WelcomeScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Login" options={{ title: '로그인' }}>
             {props => <LoginScreen {...props} onLogin={onLogin} />}
           </Stack.Screen>
           <Stack.Screen name="GuestEntry" options={{ headerShown: false }}>
@@ -32,10 +44,7 @@ export default function RootNavigator({ isLoggedIn, isGuest, onLogin, onGuestLog
         </>
       ) : (
         <>
-          <Stack.Screen name="Main" options={{ headerShown: false }}>
-            {() => <MainTabs isGuest={isGuest} onLogout={onLogout} />}
-          </Stack.Screen>
-          <Stack.Screen name="TasteSelect" component={TasteSelectScreen} options={{ title: '취향 선택' }} />
+          {needsTaste ? [taste, main] : [main, taste]}
           <Stack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ title: '채팅' }} />
           <Stack.Screen name="LoungeChat" component={LoungeChatScreen} options={{ title: '라운지' }} />
         </>

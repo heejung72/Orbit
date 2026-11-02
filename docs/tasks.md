@@ -12,9 +12,9 @@
 | 1 | [DOCS] 프로젝트 재정비 및 Git/브랜치 전략 세팅 | `docs/#1-project-setup` | - | ✅ |
 | 2 | [REFACTOR] 디렉토리 구조 개편 | `refactor/#2-directory-structure` | 1 | ✅ |
 | 3 | [REFACTOR] 스키마 재설계 | `refactor/#3-db-schema` | 2 | ✅ |
-| 4 | [FEAT] 회원 인증 | `feat/#4-member-auth` | 5 | 🟨 |
+| 4 | [FEAT] 회원 인증 | `feat/#4-member-auth` | 5 | ✅ |
 | 5 | [FEAT] Guest 세션 | `feat/#5-guest-session` | 3 | ✅ |
-| 6 | [FEAT] Welcome 화면 | `feat/#6-welcome` | 4, 5 | ⬜ |
+| 6 | [FEAT] Welcome 화면 | `feat/#6-welcome` | 4, 5 | 🟨 |
 | 7 | [FEAT] 취향 시스템 | `feat/#7-taste-system` | 4, 5 | ⬜ |
 | 8 | [FEAT] Orbit Dashboard (Home) | `feat/#8-dashboard` | 7, 9 | ⬜ |
 | 9 | [FEAT] 하단 탭 네비게이션 | `feat/#9-tab-navigation` | 6 | ⬜ |
@@ -152,10 +152,13 @@
 - 소켓 Guest 연결·Guest 채팅 → #10 / 만료 카운트다운·`guest:expired`·`guest:id` 역조회 → #12 / 가입 시 이전 → #14 / 발급 Rate Limit → #16
 
 ## #6 [FEAT] Welcome 화면
-- [ ] Orbit 로고/카피 "Find your people in the same orbit."
-- [ ] [회원가입] [로그인] [가입 없이 둘러보기]
-- [ ] 진입 분기: 토큰 있음 → Home / Guest 토큰 유효 → Home / 없음 → Welcome
-- [ ] 첫 진입 후 취향 미설정이면 TasteSelect로
+- [x] `WelcomeScreen`: 로고·카피 "Find your people in the same orbit." + [회원가입] [로그인] [가입 없이 둘러보기]
+- [x] Guest 발급 로직을 로그인 화면 → Welcome으로 이동, 로그인 화면은 이메일 로그인만
+- [x] 로그아웃 상태 첫 화면 = Welcome (로그아웃·Guest 만료 후에도)
+- [x] 진입 분기: App의 `enter()`가 `/auth/me`로 회원/Guest 확인 (앱 시작·로그인·가입·둘러보기 공통)
+- [x] 취향 0개 회원 → TasteSelect부터 (`/auth/me`의 `has_tastes`), 저장 후 돌아갈 화면이 없으면 Main으로 replace
+- [x] `test:auth`에 has_tastes 케이스 (10개), 웹 빌드
+- 하지 않은 것: Guest 취향 온보딩 → #7 / 만료 안내 문구 → #12 / 정식 디자인 → #8
 
 ## #7 [FEAT] 취향 시스템
 - [ ] `GET /tastes/categories`, `GET/PUT /tastes/me` (Member→PG, Guest→Redis)

@@ -76,7 +76,9 @@ export default function TasteSelectScreen({ navigation }) {
     try {
       await api.updateTastes([...selected]);
       Alert.alert('완료', '취향이 저장되었습니다');
-      navigation.goBack();
+      // 가입 직후 온보딩으로 들어온 경우엔 돌아갈 화면이 없으므로 Home으로 교체
+      if (navigation.canGoBack()) navigation.goBack();
+      else navigation.replace('Main');
     } catch (err) {
       Alert.alert('오류', err.message);
     }
