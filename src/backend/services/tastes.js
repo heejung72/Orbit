@@ -10,7 +10,7 @@ const MAX_INT4 = 2147483647; // taste_tags.id 범위를 넘으면 PG가 22003(50
 
 const guestTastesKey = (guestId) => `guest:tastes:${guestId}`;
 
-const TAG_COLUMNS = 'tt.id AS tag_id, tt.name, tt.category_id, tc.name AS category';
+const TAG_COLUMNS = 'tt.id AS tag_id, tt.name, tt.category_id, tc.name AS category, tc.icon AS category_icon';
 const TAG_JOIN = 'taste_tags tt JOIN taste_categories tc ON tc.id = tt.category_id';
 const MEMBER_JOIN = 'user_tastes ut JOIN taste_tags tt ON tt.id = ut.tag_id JOIN taste_categories tc ON tc.id = tt.category_id';
 const TAG_ORDER = 'ORDER BY tc.sort_order, tt.sort_order';
