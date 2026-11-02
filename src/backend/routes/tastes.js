@@ -25,6 +25,7 @@ const getMine = (actor) => (actor.type === 'guest' ? getGuestTastes(actor.id) : 
 
 function sendError(res, err) {
   if (err.code === 'UNKNOWN_TAG') return res.status(400).json({ error: err.message });
+  if (err.code === 'UNAUTHORIZED') return res.status(401).json({ error: err.message, code: 'UNAUTHORIZED' });
   if (err.code === 'REDIS_UNAVAILABLE') return res.status(503).json({ error: '잠시 후 다시 시도해주세요', code: 'UNAVAILABLE' });
   res.status(500).json({ error: '서버 오류가 발생했습니다' });
 }

@@ -86,6 +86,18 @@ const check = async (name, fn) => {
       assert.strictEqual((await call('GET', '/auth/me', undefined, M)).j.has_tastes, true);
     });
 
+    await check('같은 회원이 동시에 저장해도 마지막 요청 하나의 목록만 남음 (합쳐지지 않음)', async () => {
+      const sets = [allTags.slice(0, 3), allTags.slice(3, 6), [allTags[0], allTags[3], allTags[6]]].map((s) => s.map((t) => t.id));
+      const key = (ids) => [...ids].sort((a, b) => a - b).join();
+      for (let i = 0; i < 10; i++) {
+        const rs = await Promise.all(sets.map((s) => call('PUT', '/tastes/me', { tags: s.map((tagId) => ({ tagId, weight: 2 })) }, M)));
+        assert.ok(rs.every((r) => r.s === 200), rs.map((r) => r.s).join());
+        const got = key((await call('GET', '/tastes/me', undefined, M)).j.map((t) => t.tag_id));
+        assert.ok(sets.some((s) => key(s) === got), `합쳐진 목록: ${got}`);
+      }
+      await call('PUT', '/tastes/me', { tags: pickTags(5, 1) }, M); // 아래 '섞이지 않음' 검사용 상태 복원
+    });
+
     await check('예전 경로 PUT /users/me/tastes 제거', async () => {
       assert.strictEqual((await call('PUT', '/users/me/tastes', { tags: pickTags(3) }, M)).s, 404);
     });

@@ -16,6 +16,7 @@ const MEMBER_JOIN = 'user_tastes ut JOIN taste_tags tt ON tt.id = ut.tag_id JOIN
 const TAG_ORDER = 'ORDER BY tc.sort_order, tt.sort_order';
 
 const unknownTag = () => Object.assign(new Error('존재하지 않는 취향이 포함되어 있습니다'), { code: 'UNKNOWN_TAG' });
+const noUser = () => Object.assign(new Error('유효하지 않은 토큰입니다'), { code: 'UNAUTHORIZED' });
 
 // body.tags = [{ tagId, weight(1~3) }] 검증. 문제가 있으면 안내 문구, 없으면 null
 function validateTags(tags) {
@@ -47,10 +48,14 @@ async function getMemberTastes(userId) {
 }
 
 // 전체 교체 (DELETE → INSERT를 한 트랜잭션으로)
+// 같은 회원이 여러 기기에서 동시에 저장하면 기본 격리 수준에선 두 목록이 합쳐질 수 있어
+// users 행을 FOR UPDATE로 잠가 저장을 한 번에 하나씩 처리한다 (마지막 요청이 최종 목록)
 async function saveMemberTastes(userId, tags) {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
+    const user = await client.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [userId]);
+    if (user.rowCount === 0) throw noUser(); // 토큰은 유효하지만 계정이 사라진 경우
     await client.query('DELETE FROM user_tastes WHERE user_id = $1', [userId]);
     await client.query(
       `INSERT INTO user_tastes (user_id, tag_id, weight)
