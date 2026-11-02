@@ -23,7 +23,7 @@ export default function MainTabs({ isGuest, onLogout }) {
       }}
     >
       <Tab.Screen name="Home" options={{ title: '홈', tabBarIcon: () => <Text>🪐</Text> }}>
-        {() => <HomeScreen isGuest={isGuest} />}
+        {() => <HomeScreen />}
       </Tab.Screen>
       <Tab.Screen
         name="Lounge"

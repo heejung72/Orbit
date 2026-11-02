@@ -42,12 +42,13 @@ export const api = {
   getAvatars: () => request('/public/avatars'),
   me: () => request('/auth/me'),
 
+  // Home 대시보드 묶음 { me, tastes, question, lounges }
+  getHome: () => request('/home'),
+
   // Guest (30분 둘러보기)
   createGuestSession: () => request('/guest/session', { method: 'POST' }),
 
   // 공개 API (비로그인)
-  getPublicHome: () =>
-    fetch(`${API_URL}/public/home`).then(r => r.json()),
   getPublicLounges: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return fetch(`${API_URL}/public/lounges${qs ? `?${qs}` : ''}`).then(r => r.json());

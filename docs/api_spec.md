@@ -42,7 +42,7 @@
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
 | GET | `/tastes/categories` | O | `[{ id, code, name, icon, tags: [{ id, name }] }]` |
-| GET | `/tastes/me` | O | `[{ tag_id, name, category_id, category, weight }]` (카테고리·태그 순서) |
+| GET | `/tastes/me` | O | `[{ tag_id, name, category_id, category, category_icon, weight }]` (카테고리·태그 순서) |
 | PUT | `/tastes/me` | O | body `{ tags: [{ tagId, weight }] }` → 전체 교체 후 `GET /tastes/me`와 같은 목록 |
 
 - 규칙: **3~20개**, `weight` 정수 1~3 (3 매우 좋아함 / 2 좋아함 / 1 관심 있음), `tagId` 중복 불가
@@ -53,7 +53,15 @@
 ## Home — #8
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
-| GET | `/home` | O | 대시보드 묶음 응답: 내 취향, 궤도 데이터(비슷한 사람 수/온라인), 오늘의 질문, 추천 라운지 |
+| GET | `/home` | O | 대시보드 묶음 응답 `{ me, tastes, question, lounges }` |
+
+- `me`: `{ type: 'member' \| 'guest', nickname, avatar_id, avatar_emoji, expires_at?(Guest) }` — user_id·guestId 미노출
+- `tastes`: `GET /tastes/me`와 같은 형식
+- `question`: 오늘의 질문 `{ id, content }` — `publish_date`가 오늘(KST)인 질문 우선, 없으면 `sort_order` 순으로 하루 하나씩 순환 (`services/questions.js`, #15 재사용). 질문이 없으면 `null`
+- `lounges`: 공식 라운지 전체, 참여 인원순 (`id, name, icon, category_id, category_name, category_icon, member_count` …). 앱은 상위 3개를 Active Lounges로, 카테고리 → 라운지 매핑을 궤도 행성 터치에 사용
+- 401: 토큰 없음·만료·계정 없음 / 503 `UNAVAILABLE`: Guest 요청인데 Redis 끊김
+- 바깥 궤도의 비슷한 사람 수·온라인 표시는 #13·#10에서 추가
+- 이전 `GET /public/home`은 #8에서 제거
 
 ## Lounges — #11
 | Method | Path | 인증 | 설명 |

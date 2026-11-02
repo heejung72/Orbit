@@ -189,7 +189,7 @@ src/
 │   ├── theme/               # colors, typography, spacing
 │   ├── services/            # api.js, socket.js, storage.js
 │   └── _legacy/             # MVP에서 쓰지 않는 이전 코드 보관 (새 코드에서 import 금지)
-│                            #   예외: Home·MyOrbit의 RadarChart·VennDiagram 임시 사용 (#8·#17에서 제거)
+│                            #   예외: MyOrbit의 RadarChart 임시 사용 (#17에서 제거)
 │
 ├── backend/
 │   ├── server.js
