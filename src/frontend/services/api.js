@@ -24,7 +24,7 @@ async function request(path, options = {}) {
     // 로그인 실패(코드 없음)와 구분: 미들웨어가 준 UNAUTHORIZED이고 회원 토큰을 보냈을 때만
     if (data.code === 'GUEST_EXPIRED' || (res.status === 401 && data.code === 'UNAUTHORIZED' && token)) {
       await clearSession();
-      onSessionExpired?.();
+      onSessionExpired?.(data.code);
     }
     const err = new Error(data.error || '요청 실패');
     err.code = data.code;

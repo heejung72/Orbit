@@ -2,7 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, TextInput, Pressable, FlatList, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { api } from '../../services/api';
 import { joinRoom, leaveRoom, sendMessage, sendTyping, subscribe } from '../../services/socket';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Avatar from '../../components/Avatar';
+import GuestTimer from '../../components/GuestTimer';
 import { colors, spacing, radius, typography } from '../../theme';
 
 // 채팅방 (1:1·라운지 공통): 기록 + 실시간 메시지, 입력 중 표시, 1:1 나가기
@@ -20,6 +22,7 @@ export default function ChatRoomScreen({ route, navigation }) {
   const [typing, setTyping] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [presence, setPresence] = useState(null); // 라운지: 지금 접속 중인 인원 (room:presence)
+  const [guestExpiresAt, setGuestExpiresAt] = useState(null); // Guest면 상단에 남은 시간 표시
   const listRef = useRef(null);
   const lastTypingSent = useRef(0);
   const typingTimer = useRef(null);
@@ -51,6 +54,12 @@ export default function ChatRoomScreen({ route, navigation }) {
         : undefined,
     });
   }, [navigation, title, type]);
+
+  useEffect(() => {
+    AsyncStorage.multiGet(['isGuest', 'guestExpiresAt'])
+      .then(([[, isGuest], [, at]]) => isGuest === 'true' && at && setGuestExpiresAt(at))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     mounted.current = true;
@@ -140,6 +149,11 @@ export default function ChatRoomScreen({ route, navigation }) {
         </View>
       )}
 
+      {guestExpiresAt && (
+        <View style={styles.guestBar}>
+          <GuestTimer expiresAt={guestExpiresAt} />
+        </View>
+      )}
       {type === 'lounge' && presence !== null && (
         <Text style={styles.presence} accessibilityLiveRegion="polite">지금 {presence}명이 대화 중</Text>
       )}
@@ -204,6 +218,7 @@ const styles = StyleSheet.create({
   textMine: { color: colors.onPrimary },
 
   typing: { ...typography.caption, color: colors.textMuted, paddingHorizontal: spacing.md },
+  guestBar: { alignItems: 'center', paddingVertical: spacing.xs, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
   presence: {
     ...typography.caption, color: colors.primary, textAlign: 'center', paddingVertical: spacing.xs,
     backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border,
