@@ -27,7 +27,7 @@ router.get('/', async (req, res) => {
       getMe(req),
       req.isGuest ? getGuestTastes(req.actor.id) : getMemberTastes(req.userId),
       getTodayQuestion(),
-      listLounges(), // 공식 라운지 전체(참여 인원순): 앱이 상위 3개 표시 + 카테고리 행성 → 라운지 연결에 사용
+      listLounges({ viewer: req.actor }), // 공식 라운지 전체(Guest 포함 인원순): 앱이 상위 3개 표시 + 카테고리 행성 → 라운지 연결에 사용
     ]);
     if (!me) return res.status(401).json({ error: '유효하지 않은 토큰입니다', code: 'UNAUTHORIZED' });
     res.json({ me, tastes, question, lounges });

@@ -1,30 +1,48 @@
 const express = require('express');
-const db = require('../db');
-const { listLounges, getLounge } = require('../services/lounges');
+const { listLounges, recommendLounges, getLounge } = require('../services/lounges');
+const { joinLounge, leaveLounge } = require('../services/loungeMembers');
 const { toUuid, toId } = require('../utils/validate');
 
+// /api/lounges — optionalAuth 아래 (회원·Guest, 토큰 없으면 401). 판단은 req.actor 기준
 const router = express.Router();
 
-// 라운지 목록 (카테고리 필터·검색)
+function sendError(res, err, where) {
+  if (err.code === 'NOT_FOUND') return res.status(404).json({ error: err.message });
+  if (err.code === 'FULL') return res.status(400).json({ error: err.message, code: 'LOUNGE_FULL' });
+  if (err.code === 'REDIS_UNAVAILABLE') return res.status(503).json({ error: '잠시 후 다시 시도해주세요', code: 'UNAVAILABLE' });
+  console.error(`${where} 실패:`, err.message);
+  res.status(500).json({ error: '서버 오류가 발생했습니다' });
+}
+
+// 라운지 목록 (카테고리 필터·검색, 인원순) + 내 참여 여부
 router.get('/', async (req, res) => {
   try {
     const { category_id, search } = req.query;
     const categoryId = category_id === undefined ? null : toId(category_id);
     if (category_id !== undefined && !categoryId) return res.status(400).json({ error: 'category_id가 올바르지 않습니다' });
-    res.json(await listLounges({ categoryId, search: typeof search === 'string' ? search : undefined }));
+    res.json(await listLounges({ categoryId, search: typeof search === 'string' ? search : undefined, viewer: req.actor }));
   } catch (err) {
-    res.status(500).json({ error: '서버 오류가 발생했습니다' });
+    sendError(res, err, 'GET /api/lounges');
   }
 });
 
-// 라운지 상세 (chat_room_id, 내 참여 여부 포함)
+// 내 취향 기반 추천 (/:id보다 먼저)
+router.get('/recommended', async (req, res) => {
+  try {
+    res.json(await recommendLounges(req.actor));
+  } catch (err) {
+    sendError(res, err, 'GET /api/lounges/recommended');
+  }
+});
+
+// 라운지 상세 (chat_room_id, 대표 태그, 회원 참여자, guest_count, 내 참여 여부)
 router.get('/:id', async (req, res) => {
   try {
-    const lounge = await getLounge(req.params.id, req.isGuest ? null : req.userId);
+    const lounge = await getLounge(req.params.id, req.actor);
     if (!lounge) return res.status(404).json({ error: '라운지를 찾을 수 없습니다' });
     res.json(lounge);
   } catch (err) {
-    res.status(500).json({ error: '서버 오류가 발생했습니다' });
+    sendError(res, err, 'GET /api/lounges/:id');
   }
 });
 
@@ -33,49 +51,27 @@ router.post('/', (req, res) => {
   res.status(501).json({ error: '라운지 만들기는 준비 중이에요' });
 });
 
-// 라운지 참여 (회원만 PG에 기록. Guest 참여는 #11에서 Redis로)
+// 참여 (회원 PG / Guest Redis, 정원은 Guest 포함)
 router.post('/:id/join', async (req, res) => {
-  if (req.isGuest) {
-    return res.status(403).json({ error: '회원만 라운지에 참여할 수 있어요', code: 'MEMBER_ONLY' });
-  }
   const loungeId = toUuid(req.params.id);
   if (!loungeId) return res.status(404).json({ error: '라운지를 찾을 수 없습니다' });
   try {
-    const lounge = await db.query(
-      `SELECT l.max_members, (SELECT COUNT(*)::int FROM lounge_members WHERE lounge_id = l.id) AS member_count
-       FROM lounges l WHERE l.id = $1`,
-      [loungeId]
-    );
-    if (lounge.rows.length === 0) return res.status(404).json({ error: '라운지를 찾을 수 없습니다' });
-    if (lounge.rows[0].member_count >= lounge.rows[0].max_members) {
-      return res.status(400).json({ error: '라운지 정원이 가득 찼어요' });
-    }
-
-    await db.query(
-      'INSERT INTO lounge_members (lounge_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-      [loungeId, req.userId]
-    );
+    await joinLounge(loungeId, req.actor);
     res.json({ message: '라운지에 참여했어요' });
   } catch (err) {
-    res.status(500).json({ error: '서버 오류가 발생했습니다' });
+    sendError(res, err, 'POST /api/lounges/:id/join');
   }
 });
 
-// 라운지 나가기
+// 나가기
 router.delete('/:id/leave', async (req, res) => {
-  if (req.isGuest) {
-    return res.status(403).json({ error: '회원만 라운지에 참여할 수 있어요', code: 'MEMBER_ONLY' });
-  }
   const loungeId = toUuid(req.params.id);
   if (!loungeId) return res.status(404).json({ error: '라운지를 찾을 수 없습니다' });
   try {
-    await db.query('DELETE FROM lounge_members WHERE lounge_id = $1 AND user_id = $2', [
-      loungeId,
-      req.userId,
-    ]);
+    await leaveLounge(loungeId, req.actor);
     res.json({ message: '라운지에서 나갔어요' });
   } catch (err) {
-    res.status(500).json({ error: '서버 오류가 발생했습니다' });
+    sendError(res, err, 'DELETE /api/lounges/:id/leave');
   }
 });
 

@@ -2,15 +2,31 @@ const express = require('express');
 const db = require('../db');
 const { getRoomForActor } = require('../services/chatAccess');
 const { getMessages } = require('../services/chat');
+const { joinedLoungeIds } = require('../services/loungeMembers');
 const { toPositiveInt, toIsoDate } = require('../utils/validate');
 
 // /api/chat — optionalAuth 아래 (회원·Guest, 토큰 없으면 401). 접근 판단은 항상 req.actor 기준
 const router = express.Router();
 
-// 내 채팅방 목록 — Guest는 1:1 방(#13)·라운지 참여(#11)가 아직 없어 빈 목록
+// 참여한 라운지의 채팅방 목록 (최근 메시지순)
+const LOUNGE_ROOMS_SQL = `
+  SELECT cr.id, cr.type, cr.created_at, l.id AS lounge_id, l.name AS lounge_name,
+         lmsg.content AS last_message, lmsg.created_at AS last_message_at
+  FROM lounges l
+  JOIN chat_rooms cr ON cr.lounge_id = l.id
+  LEFT JOIN LATERAL (
+    SELECT content, created_at FROM messages WHERE room_id = cr.id ORDER BY created_at DESC LIMIT 1
+  ) lmsg ON true
+  WHERE l.id = ANY($1::uuid[])
+  ORDER BY lmsg.created_at DESC NULLS LAST`;
+
+// 내 채팅방 목록 — Guest는 1:1 방이 #13부터라 direct는 빈 목록, 라운지는 Redis 참여 목록
 router.get('/rooms', async (req, res) => {
-  if (req.actor.type === 'guest') return res.json({ direct: [], lounges: [] });
   try {
+    const loungeIds = [...(await joinedLoungeIds(req.actor))];
+    const loungeRooms = loungeIds.length ? (await db.query(LOUNGE_ROOMS_SQL, [loungeIds])).rows : [];
+    if (req.actor.type === 'guest') return res.json({ direct: [], lounges: loungeRooms });
+
     // 1:1 채팅방 — 상대는 방 단위 익명 표시 이름으로
     const directRooms = await db.query(
       `SELECT cr.id, cr.type, cr.created_at,
@@ -27,23 +43,10 @@ router.get('/rooms', async (req, res) => {
       [req.userId]
     );
 
-    // 내가 참여한 라운지 채팅방
-    const loungeRooms = await db.query(
-      `SELECT cr.id, cr.type, cr.created_at, l.id AS lounge_id, l.name AS lounge_name,
-              lmsg.content AS last_message, lmsg.created_at AS last_message_at
-       FROM lounge_members lm
-       JOIN lounges l ON l.id = lm.lounge_id
-       JOIN chat_rooms cr ON cr.lounge_id = l.id
-       LEFT JOIN LATERAL (
-         SELECT content, created_at FROM messages WHERE room_id = cr.id ORDER BY created_at DESC LIMIT 1
-       ) lmsg ON true
-       WHERE lm.user_id = $1
-       ORDER BY lmsg.created_at DESC NULLS LAST`,
-      [req.userId]
-    );
-
-    res.json({ direct: directRooms.rows, lounges: loungeRooms.rows });
+    res.json({ direct: directRooms.rows, lounges: loungeRooms });
   } catch (err) {
+    if (err.code === 'REDIS_UNAVAILABLE') return res.status(503).json({ error: '잠시 후 다시 시도해주세요', code: 'UNAVAILABLE' });
+    console.error('GET /api/chat/rooms 실패:', err.message);
     res.status(500).json({ error: '서버 오류가 발생했습니다' });
   }
 });

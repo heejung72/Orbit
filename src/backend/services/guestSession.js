@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const { getRedis } = require('../redis');
 const { guestTastesKey } = require('./tastes');
+const { removeGuestFromLounges } = require('./loungeMembers');
 
 // Guest 세션 (docs/system_design.md §4)
 // - 토큰 원본은 클라이언트만 가진다. Redis에는 SHA-256 해시를 키로 저장 (Redis 유출 시 토큰 재사용 방지)
@@ -44,10 +45,11 @@ async function findGuestSession(token) {
   return { guestId: s.guestId, nickname: s.nickname, avatarId: Number(s.avatarId), avatarEmoji: s.avatarEmoji, expiresAt };
 }
 
-// 세션과 함께 Guest 임시 데이터(취향)도 지운다. 시간 만료 시에는 같은 TTL로 함께 사라진다
+// 세션과 함께 Guest 임시 데이터(취향·라운지 참여)도 지운다. 시간 만료 시에는 같은 TTL·score로 함께 사라진다
 async function deleteGuestSession(token) {
   const redis = getRedis();
   const guestId = await redis.hGet(keyOf(token), 'guestId');
+  if (guestId) await removeGuestFromLounges(guestId);
   await redis.del(guestId ? [keyOf(token), guestTastesKey(guestId)] : [keyOf(token)]);
 }
 
