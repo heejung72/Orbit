@@ -16,9 +16,9 @@
 | 5 | [FEAT] Guest 세션 | `feat/#5-guest-session` | 3 | ✅ |
 | 6 | [FEAT] Welcome 화면 | `feat/#6-welcome` | 4, 5 | ✅ |
 | 7 | [FEAT] 취향 시스템 | `feat/#7-taste-system` | 4, 5 | ✅ |
-| 8 | [FEAT] Orbit Dashboard (Home) | `feat/#8-dashboard` | 7 | 🟨 |
-| 9 | [FEAT] 하단 탭 네비게이션 | `feat/#9-tab-navigation` | 6 | ⬜ |
-| 10 | [FEAT] Socket.io 실시간 채팅 기반 | `feat/#10-socket-chat` | 4, 5 | ⬜ |
+| 8 | [FEAT] Orbit Dashboard (Home) | `feat/#8-dashboard` | 7 | ✅ |
+| 9 | [FEAT] 하단 탭 네비게이션 | - | - | 닫음 (탭 구조는 #2, 디자인은 #24, Guest My Orbit은 #17) |
+| 10 | [FEAT] Socket.io 실시간 채팅 기반 | `feat/#10-socket-chat` | 4, 5 | 🟨 |
 | 11 | [FEAT] 취향 라운지 | `feat/#11-lounge` | 10 | ⬜ |
 | 12 | [FEAT] Guest Time Attack | `feat/#12-guest-time-attack` | 5, 10 | ⬜ |
 | 13 | [FEAT] 1:1 취향 매칭 | `feat/#13-matching` | 7, 10 | ⬜ |
@@ -27,7 +27,7 @@
 | 16 | [FEAT] 신고·차단, 비속어 필터·스팸 Rate Limit | `feat/#16-safety` | 10 | ⬜ |
 | 17 | [FEAT] My Orbit | `feat/#17-my-orbit` | 7, 9 | ⬜ |
 
-**권장 진행 순서:** 1 → 2 → 3 → **5 → 4** → 6 → **7 → 8** → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17
+**권장 진행 순서:** 1 → 2 → 3 → **5 → 4** → 6 → **7 → 8** → 10 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17
 
 ---
 
@@ -198,14 +198,21 @@
 - [ ] 각 탭 placeholder 화면 연결
 
 ## #10 [FEAT] Socket.io 실시간 채팅 기반
-- [ ] 소켓 인증 (JWT / guestToken) — 연결 시 + **모든 이벤트 처리 전** Guest `expiresAt` 검사, 지났으면 `guest:expired` 전송 후 disconnect
-- [ ] 브로드캐스트 시 만료된 Guest 수신자 제외
-- [ ] 이벤트: `room:join`, `room:leave`, `message:send`, `message:new`, `typing` ([system_design.md §5](./system_design.md))
-- [ ] 저장 규칙: Member→PG, Guest 관련→Redis ([§4-3](./system_design.md))
-- [ ] 로거 마스킹 (Guest 메시지 본문 로그 금지)
-- [ ] `GET /chat/rooms`, `GET /chat/rooms/:id/messages`, 나가기
-- [ ] ChatList, ChatRoom 화면 (말풍선, 익명 닉네임·캐릭터)
-- [ ] 온라인 상태 `online:actors`
+### Backend
+- [x] 소켓 인증: 회원 JWT(`auth.token`) / Guest(`auth.guestToken`), 예전 Guest JWT 거부
+- [x] Guest는 **모든 이벤트 처리 전** 세션 재확인 → `guest:expired` 후 종료, 브로드캐스트 시 만료 Guest 수신자 제외
+- [x] 이벤트 `room:join` · `room:leave` · `message:send` · `typing` / `message:new` · `typing` · `guest:expired`, 결과는 ack
+- [x] `services/chatAccess.js` 회원·Guest 공용 방 접근 (1:1은 참여 회원만, 라운지는 회원·Guest)
+- [x] `services/chat.js`: 회원 → PG, Guest → Redis `room:{id}:guestmsgs`, 기록은 시간순 병합(만료 Guest 제외), 수신자마다 `is_mine`
+- [x] `/api/chat` optionalAuth, `POST /chat/rooms/:id/leave`(둘 다 나가면 방 종료)
+- [x] 메시지 본문은 로그에 남기지 않음 (오류 로그는 `err.message`만)
+- [x] `tests/chat.e2e.js` + `npm run test:chat` (13개), `socket.io-client` devDependency
+
+### Frontend
+- [x] `services/socket.js`: 회원·Guest 연결, ack Promise, 인증 거절·`guest:expired` → 세션 종료 콜백
+- [x] App: 로그인·둘러보기 중에만 소켓 연결 (이전에는 연결 코드가 호출되지 않았음)
+- [x] ChatRoom 재작성: 기록 + 실시간, 재연결 시 다시 입장, 말풍선(닉네임·캐릭터·Guest 배지), 입력 중, 전송 실패 안내, 1:1 나가기(확인 배너)
+- 하지 않은 것: 만료 타이머·5분 전 알림 → #12 / 라운지 참여·`room:presence` → #11 / Guest 1:1 방·온라인 상태 → #13 / 가입 유도 배너(이전 5개마다 표시하던 것 제거) → #14 / Rate Limit·차단 → #16
 
 ## #11 [FEAT] 취향 라운지
 - [ ] `GET /lounges`, `/lounges/recommended`, `/lounges/:id`, `/lounges/:id/messages`
