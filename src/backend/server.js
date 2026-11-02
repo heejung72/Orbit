@@ -48,6 +48,7 @@ app.use('/api/reports', memberAuth, reportRoutes);
 
 // Socket.io
 setupSocket(io);
+app.set('io', io); // 라우트에서 소켓 방 정리용 (예: 1:1 방 나가기)
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {

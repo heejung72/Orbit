@@ -90,6 +90,6 @@
 - ⚠️ **#3 이후 로컬 DB는 초기화 필요**: `cd src/backend && npm run db:setup` (기존 TasteMate 테이블과 호환 안 됨)
 - 임시 API 형태(#3에서 유지): `POST /matching/find` 등은 #13에서 api_spec 형태로 교체 (`PUT /users/me/tastes`는 #7에서 `/tastes/me`로 교체 완료)
 - 메시지(REST·소켓)는 `is_mine`만 내려줌(실제 user_id 제거, PR #20). 매칭 후보 `id`는 아직 실제 user_id → #13에서 익명 참조로 교체
-- 소켓 `send_message` Rate Limit 없음 → #16에서 Redis 기반으로 추가
-- ⚠️ **Guest는 HTTP까지만 목표 설계와 같음**: Redis 30분 세션은 #5에서 구현. 소켓 Guest·Guest 채팅(#10), 만료 카운트다운·`guest:expired`(#12)는 아직 없음
+- 소켓 `message:send` Rate Limit 없음 → #16에서 Redis 기반으로 추가
+- Guest: Redis 30분 세션(#5), 소켓 연결·라운지 채팅·이벤트 시점 만료 확인(`guest:expired`)은 #10에서 구현. 소켓별 만료 타이머·5분 전 알림·카운트다운은 #12, Guest 1:1 방은 #13
 - `src/backend/.env`는 git 제외됨. 새 환경에서는 `.env.example` 복사

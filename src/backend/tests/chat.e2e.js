@@ -215,6 +215,12 @@ const check = async (name, fn) => {
     await check('1:1 나가기: 나간 사람은 입장 불가, 둘 다 나가면 방 종료, 라운지는 400', async () => {
       assert.strictEqual((await call('POST', `/chat/rooms/${loungeRoom}/leave`, undefined, A.H)).s, 400);
       assert.strictEqual((await call('POST', `/chat/rooms/${direct}/leave`, undefined, A.H)).s, 200);
+      // room:leave를 보내지 않은 기존 소켓(a1)도 나간 뒤 메시지는 받지 않음
+      const before = a1.received.filter((m) => m.room_id === direct).length;
+      await emit(b, 'message:send', { roomId: direct, content: '나간 뒤 메시지' });
+      await sleep(300);
+      assert.strictEqual(a1.received.filter((m) => m.room_id === direct).length, before);
+      assert.strictEqual(b.received.at(-1).content, '나간 뒤 메시지');
       assert.strictEqual((await emit(a1, 'room:join', { roomId: direct })).code, 'ROOM_NOT_FOUND');
       assert.strictEqual((await call('GET', `/chat/rooms/${direct}/messages`, undefined, A.H)).s, 404);
       assert.strictEqual((await db.query('SELECT closed_at FROM chat_rooms WHERE id = $1', [direct])).rows[0].closed_at, null);

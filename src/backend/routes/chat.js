@@ -93,6 +93,11 @@ router.post('/rooms/:roomId/leave', async (req, res) => {
     } finally {
       client.release();
     }
+    // 이 회원의 모든 기기 소켓을 방에서 빼서, 나간 뒤에는 새 메시지를 받지 않게 한다
+    const io = req.app.get('io');
+    for (const s of await io.in(room.id).fetchSockets()) {
+      if (s.data.actor.type === 'member' && s.data.actor.id === req.actor.id) s.leave(room.id);
+    }
     res.json({ message: '대화방을 나갔어요' });
   } catch (err) {
     console.error('POST /api/chat/rooms/:id/leave 실패:', err.message);

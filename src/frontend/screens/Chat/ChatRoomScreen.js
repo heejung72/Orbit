@@ -102,7 +102,7 @@ export default function ChatRoomScreen({ route, navigation }) {
 
   const renderItem = ({ item }) => (
     <View style={[styles.row, item.is_mine && styles.rowMine]}>
-      {!item.is_mine && <Avatar emoji={item.sender_avatar_emoji} size={32} />}
+      {!item.is_mine && <Avatar emoji={item.sender_avatar_emoji} size={32} label={`${item.sender_nickname}의 캐릭터`} />}
       <View style={[styles.body, item.is_mine && styles.bodyMine]}>
         {!item.is_mine && (
           <View style={styles.sender}>
