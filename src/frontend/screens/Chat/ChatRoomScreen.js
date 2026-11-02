@@ -19,6 +19,7 @@ export default function ChatRoomScreen({ route, navigation }) {
   const [sending, setSending] = useState(false);
   const [typing, setTyping] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [presence, setPresence] = useState(null); // 라운지: 지금 접속 중인 인원 (room:presence)
   const listRef = useRef(null);
   const lastTypingSent = useRef(0);
   const typingTimer = useRef(null);
@@ -60,12 +61,14 @@ export default function ChatRoomScreen({ route, navigation }) {
       clearTimeout(typingTimer.current);
       typingTimer.current = setTimeout(() => setTyping(false), TYPING_SHOW_MS);
     });
+    const offPresence = subscribe('room:presence', (p) => p.roomId === roomId && setPresence(p.count));
     const offConnect = subscribe('connect', enterRoom);
     return () => {
       leaveRoom(roomId);
       offMessage();
       offTyping();
       offConnect();
+      offPresence();
       clearTimeout(typingTimer.current);
     };
   }, [roomId, enterRoom]);
@@ -131,6 +134,10 @@ export default function ChatRoomScreen({ route, navigation }) {
         </View>
       )}
 
+      {type === 'lounge' && presence !== null && (
+        <Text style={styles.presence} accessibilityLiveRegion="polite">지금 {presence}명이 대화 중</Text>
+      )}
+
       <FlatList
         ref={listRef}
         data={messages}
@@ -191,6 +198,10 @@ const styles = StyleSheet.create({
   textMine: { color: colors.onPrimary },
 
   typing: { ...typography.caption, color: colors.textMuted, paddingHorizontal: spacing.md },
+  presence: {
+    ...typography.caption, color: colors.primary, textAlign: 'center', paddingVertical: spacing.xs,
+    backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
   error: { ...typography.caption, color: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
 
   banner: {
