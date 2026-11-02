@@ -139,7 +139,7 @@ sequenceDiagram
 ## 5. 실시간(Socket.io) 이벤트
 
 - **연결 인증**: `auth.token`(회원 JWT) 또는 `auth.guestToken`(Guest). 거절 시 `connect_error`의 `data.code` = `UNAUTHORIZED` / `GUEST_EXPIRED` / `UNAVAILABLE`
-- **Guest는 모든 이벤트 처리 전** 세션을 다시 확인하고, 만료(시간·직접 종료)면 `guest:expired`를 보낸 뒤 연결을 끊는다 (#10). 소켓별 만료 타이머·5분 전 알림은 #12
+- **Guest는 모든 이벤트 처리 전** 세션을 다시 확인하고, 만료(시간·직접 종료)면 `guest:expired`를 보낸 뒤 연결을 끊는다 (#10). 이벤트가 없어도 **소켓별 만료 타이머**가 `expiresAt`에 같은 처리를 한다 (#11, PR #28). 5분 전 알림·누락 소켓 정리 스케줄러는 #12
 - **결과·오류는 ack 콜백** `{ ok: true, ... }` / `{ ok: false, code, message }` (`ROOM_NOT_FOUND`, `ROOM_CLOSED`, `INVALID_MESSAGE`, `UNAVAILABLE`, `SERVER_ERROR`)
 
 | 방향 | 이벤트 | payload | 설명 |
@@ -150,7 +150,7 @@ sequenceDiagram
 | C→S | `typing` | `{roomId}` | 입력 중 (같은 방의 다른 소켓에게 `typing {roomId}`) |
 | S→C | `message:new` | `{id, room_id, content, created_at, is_mine, is_guest, sender_nickname, sender_avatar_emoji}` | 새 메시지. `is_mine`은 받는 소켓마다 계산, 만료된 Guest 수신자는 받지 않고 종료 |
 | S→C | `typing` | `{roomId}` | 상대 입력 중 |
-| S→C | `guest:expired` | `{}` | 만료, 서버가 연결 종료 (#10 이벤트 시점, #12 타이머) |
+| S→C | `guest:expired` | `{}` | 만료, 서버가 연결 종료 (#10 이벤트 시점, #11 소켓 타이머) |
 | S→C | `room:presence` | `{roomId, count}` | 라운지 채팅방에 **지금 접속 중인 사람 수**(같은 사람 여러 기기는 1명). 입장·퇴장·연결 끊김 때 방 전체에 전송 (#11) |
 | S→C | `match:request` / `match:accepted` | `{matchId, ...}` | 매칭 (#13) |
 | S→C | `guest:warning` | `{remainingSec: 300}` | 만료 5분 전 (#12) |

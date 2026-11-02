@@ -196,17 +196,19 @@ const check = async (name, fn) => {
       await expired;
     });
 
-    await check('브로드캐스트 때 만료된 Guest 수신자는 메시지를 받지 않고 종료, 만료 Guest 메시지는 기록에서 빠짐', async () => {
+    await check('만료 시각이 되면 이벤트 없이도 guest:expired 후 종료(소켓 타이머), 이후 메시지는 받지 않고 만료 Guest 메시지는 기록에서 빠짐', async () => {
       const G4 = await guest();
       await redis.hSet(sessionKey(G4.guestToken), 'expiresAt', String(Date.now() + 2500)); // 2.5초 뒤 만료
       const g4 = await connect({ guestToken: G4.guestToken });
+      const expired = once(g4, 'guest:expired', 5000);
       await emit(g4, 'room:join', { roomId: loungeRoom });
       await emit(g4, 'message:send', { roomId: loungeRoom, content: `곧 사라질 메시지 ${id}` });
-      await sleep(3000);
-      const expired = once(g4, 'guest:expired');
+      await expired; // 아무 이벤트도 보내지 않아도 만료 시각에 도착
+      await sleep(300);
+      assert.ok(g4.disconnected);
       const before = g4.received.length;
       await emit(b, 'message:send', { roomId: loungeRoom, content: '만료 뒤 메시지' });
-      await expired;
+      await sleep(300);
       assert.strictEqual(g4.received.length, before);
       const history = (await call('GET', `/chat/rooms/${loungeRoom}/messages`, undefined, Bm.H)).j;
       assert.ok(!history.some((m) => m.content === `곧 사라질 메시지 ${id}`));

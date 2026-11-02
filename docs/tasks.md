@@ -220,7 +220,8 @@
 - [x] `POST /lounges/:id/join` Guest 허용, 정원(Guest 포함) 라운지 행 잠금, 이미 참여 중이면 200
 - [x] 목록·상세·Home `member_count`에 Guest 포함, `is_member`, 상세 `guest_count`
 - [x] `GET /lounges/recommended` (대표 태그 겹침 × 중요도 × 2 + 카테고리 점수)
-- [x] 소켓 `room:presence` (입장·퇴장·끊김, 같은 사람 여러 기기 1명)
+- [x] 소켓 `room:presence` (입장·퇴장·끊김, 같은 사람 여러 기기 1명), 퇴장·입력 중도 UUID 정규화
+- [x] Guest 소켓별 만료 타이머 (원래 #12, PR #28 리뷰로 당김)
 - [x] `GET /chat/rooms` Guest 라운지 탭, Guest 직접 종료 시 라운지에서 제거
 - [x] Redis 끊김: 회원은 회원 수만으로 계속 동작
 - [x] `tests/lounges.e2e.js` + `npm run test:lounges` (8개)
@@ -233,7 +234,7 @@
 
 ## #12 [FEAT] Guest Time Attack
 - [ ] `GuestTimer` 컴포넌트 (mm:ss, 5분 이하 강조색)
-- [ ] 소켓별 만료 타이머 (`expiresAt - now`): `guest:expired` **전송 후** disconnect → 방 퇴장 브로드캐스트 → Redis 정리
+- [x] 소켓별 만료 타이머 (`expiresAt - now`): `guest:expired` **전송 후** disconnect → 방 인원 갱신 — #11(PR #28)에서 완료. 남은 것: 만료 시 Redis 데이터 즉시 정리
 - [ ] 보조 스케줄러 `jobs/guestExpiry.js` (30초 주기): 타이머에서 누락된 소켓·키 정리
 - [ ] `guest:warning`(5분 전), `guest:expired` 이벤트
 - [ ] 앱: 만료 시 토큰 삭제 → "궤도가 사라졌어요" 화면 → Welcome

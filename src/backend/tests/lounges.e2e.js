@@ -173,6 +173,57 @@ const check = async (name, fn) => {
       assert.strictEqual(a2.presence.at(-1), 1);
     });
 
+    await check('동시 참여가 DB 연결 풀(기본 10개)보다 많아도 멈추지 않음 (잠금 중 연결을 추가로 빌리지 않음)', async () => {
+      const many = await Promise.all(Array.from({ length: 20 }, (_, i) => member(`동시${i}`)));
+      const started = Date.now();
+      const results = await Promise.race([
+        Promise.all(many.map((u) => call('POST', `/lounges/${L}/join`, undefined, u.H))),
+        sleep(10000).then(() => null),
+      ]);
+      assert.ok(results, `20건 동시 참여가 10초 안에 끝나지 않음`);
+      assert.ok(results.every((r) => r.s === 200), results.map((r) => r.s).join());
+      assert.ok(Date.now() - started < 10000);
+      await Promise.all(many.map((u) => call('DELETE', `/lounges/${L}/leave`, undefined, u.H)));
+    });
+
+    await check('대문자 UUID로 입장·퇴장해도 소켓 방·접속 인원이 맞음', async () => {
+      const room = (await detail(A.H)).chat_room_id;
+      const watcher = await connect({ token: C.token });
+      await emit(watcher, 'room:join', { roomId: room });
+      await sleep(200);
+      const base = watcher.presence.at(-1); // 앞 테스트에서 남은 소켓까지 포함한 기준 인원
+      const U = await member('대문자'); // 다른 기기 소켓이 방에 남아 있지 않은 새 회원
+      const a = await connect({ token: U.token });
+      await emit(a, 'room:join', { roomId: room.toUpperCase() });
+      await sleep(200);
+      assert.strictEqual(watcher.presence.at(-1), base + 1);
+      await emit(a, 'room:leave', { roomId: room.toUpperCase() });
+      await sleep(200);
+      assert.strictEqual(watcher.presence.at(-1), base);
+      watcher.close();
+      a.close();
+    });
+
+    await check('이벤트를 보내지 않는 Guest도 만료 시각에 guest:expired 후 종료되고 접속 인원에서 빠짐', async () => {
+      const room = (await detail(A.H)).chat_room_id;
+      const watcher = await connect({ token: C.token });
+      await emit(watcher, 'room:join', { roomId: room });
+      await sleep(200);
+      const base = watcher.presence.at(-1);
+      const Gx = await guest();
+      await redis.hSet(sessionKey(Gx.guestToken), 'expiresAt', String(Date.now() + 1500)); // 1.5초 뒤 만료
+      const gx = await connect({ guestToken: Gx.guestToken });
+      let expired = false;
+      gx.on('guest:expired', () => { expired = true; });
+      await emit(gx, 'room:join', { roomId: room });
+      await sleep(200);
+      assert.strictEqual(watcher.presence.at(-1), base + 1);
+      await sleep(2000); // 아무 이벤트도 보내지 않고 기다림
+      assert.ok(expired && gx.disconnected);
+      assert.strictEqual(watcher.presence.at(-1), base);
+      watcher.close();
+    });
+
     console.log(`\n${passed}개 통과`);
   } catch (err) {
     console.error('FAIL ', err.message);

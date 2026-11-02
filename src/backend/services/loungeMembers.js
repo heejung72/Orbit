@@ -43,7 +43,11 @@ async function joinLounge(loungeId, actor) {
     const lounge = await client.query('SELECT max_members FROM lounges WHERE id = $1 FOR UPDATE', [loungeId]);
     if (!lounge.rows[0]) throw loungeError('NOT_FOUND', '라운지를 찾을 수 없습니다');
 
-    if ((await joinedLoungeIds(actor)).has(loungeId)) {
+    // 잠금을 쥔 채 풀에서 연결을 하나 더 빌리지 않도록, 회원 확인은 같은 트랜잭션 클라이언트로
+    const alreadyJoined = actor.type === 'guest'
+      ? await getRedis().sIsMember(guestLoungesKey(actor.id), loungeId)
+      : (await client.query('SELECT 1 FROM lounge_members WHERE lounge_id = $1 AND user_id = $2', [loungeId, actor.id])).rowCount > 0;
+    if (alreadyJoined) {
       await client.query('COMMIT');
       return;
     }
