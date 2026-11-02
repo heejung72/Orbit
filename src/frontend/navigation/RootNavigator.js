@@ -13,7 +13,7 @@ import { colors } from '../theme';
 
 const Stack = createNativeStackNavigator();
 
-// 로그아웃 상태 첫 화면 = Welcome / 로그인 상태 첫 화면 = Main (취향 0개 회원은 TasteSelect)
+// 로그아웃 상태 첫 화면 = Welcome / 로그인 상태 첫 화면 = Main (취향 0개면 회원·Guest 모두 TasteSelect)
 // 그룹이 바뀔 때 목록의 첫 화면부터 시작하므로 순서로 진입 화면을 정한다
 export default function RootNavigator({ isLoggedIn, isGuest, needsTaste, onLogin, onGuestLogin, onLogout }) {
   const main = (

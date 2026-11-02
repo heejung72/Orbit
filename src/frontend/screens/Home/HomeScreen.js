@@ -199,11 +199,11 @@ export default function HomeScreen({ isGuest }) {
 
       {/* 인기 취향 (모든 사용자) */}
       {tastes.map(cat => (
-        cat.options.length > 0 && (
+        cat.tags.length > 0 && (
           <View key={cat.id} style={styles.section}>
             <Text style={styles.sectionTitle}>{cat.icon} {cat.name}</Text>
             <FlatList
-              data={cat.options}
+              data={cat.tags}
               renderItem={renderTasteCard}
               keyExtractor={item => String(item.id)}
               horizontal
