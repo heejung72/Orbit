@@ -19,18 +19,23 @@ export default function ChatRoomScreen({ route, navigation }) {
   const [sending, setSending] = useState(false);
   const [typing, setTyping] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [presence, setPresence] = useState(null); // 라운지: 지금 접속 중인 인원 (room:presence)
   const listRef = useRef(null);
   const lastTypingSent = useRef(0);
   const typingTimer = useRef(null);
+  const mounted = useRef(true); // 기록 조회 중에 화면을 떠나면 그 뒤에 방에 입장하지 않도록
 
   // 기록 다시 불러오기 + 방 입장 (처음, 그리고 재연결될 때마다 — 서버는 재연결 시 방 정보를 잃는다)
   const enterRoom = useCallback(async () => {
     try {
-      setMessages(await api.getMessages(roomId));
+      const history = await api.getMessages(roomId);
+      if (mounted.current) setMessages(history);
     } catch (err) {
-      setError(err instanceof TypeError ? '서버에 연결할 수 없어요' : err.message);
+      if (mounted.current) setError(err instanceof TypeError ? '서버에 연결할 수 없어요' : err.message);
     }
+    if (!mounted.current) return; // 정리 함수가 이미 leaveRoom을 보냈다면 다시 입장하지 않는다
     const res = await joinRoom(roomId);
+    if (!mounted.current) return leaveRoom(roomId); // 입장 응답 전에 떠났으면 바로 퇴장
     if (!res.ok) setError(res.message);
   }, [roomId]);
 
@@ -48,6 +53,7 @@ export default function ChatRoomScreen({ route, navigation }) {
   }, [navigation, title, type]);
 
   useEffect(() => {
+    mounted.current = true;
     enterRoom();
     const offMessage = subscribe('message:new', (m) => {
       if (m.room_id !== roomId) return;
@@ -60,12 +66,15 @@ export default function ChatRoomScreen({ route, navigation }) {
       clearTimeout(typingTimer.current);
       typingTimer.current = setTimeout(() => setTyping(false), TYPING_SHOW_MS);
     });
+    const offPresence = subscribe('room:presence', (p) => p.roomId === roomId && setPresence(p.count));
     const offConnect = subscribe('connect', enterRoom);
     return () => {
+      mounted.current = false;
       leaveRoom(roomId);
       offMessage();
       offTyping();
       offConnect();
+      offPresence();
       clearTimeout(typingTimer.current);
     };
   }, [roomId, enterRoom]);
@@ -131,6 +140,10 @@ export default function ChatRoomScreen({ route, navigation }) {
         </View>
       )}
 
+      {type === 'lounge' && presence !== null && (
+        <Text style={styles.presence} accessibilityLiveRegion="polite">지금 {presence}명이 대화 중</Text>
+      )}
+
       <FlatList
         ref={listRef}
         data={messages}
@@ -191,6 +204,10 @@ const styles = StyleSheet.create({
   textMine: { color: colors.onPrimary },
 
   typing: { ...typography.caption, color: colors.textMuted, paddingHorizontal: spacing.md },
+  presence: {
+    ...typography.caption, color: colors.primary, textAlign: 'center', paddingVertical: spacing.xs,
+    backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
   error: { ...typography.caption, color: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
 
   banner: {

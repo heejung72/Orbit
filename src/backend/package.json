@@ -15,7 +15,8 @@
     "test:auth": "node tests/auth.e2e.js",
     "test:tastes": "node tests/tastes.e2e.js",
     "test:home": "node tests/home.e2e.js",
-    "test:chat": "node tests/chat.e2e.js"
+    "test:chat": "node tests/chat.e2e.js",
+    "test:lounges": "node tests/lounges.e2e.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

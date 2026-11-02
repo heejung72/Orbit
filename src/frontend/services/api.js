@@ -87,6 +87,7 @@ export const api = {
     const qs = new URLSearchParams(params).toString();
     return request(`/lounges${qs ? `?${qs}` : ''}`);
   },
+  getRecommendedLounges: () => request('/lounges/recommended'), // 내 취향 기반 (최대 5개)
   getLounge: (id) => request(`/lounges/${id}`),
   createLounge: (data) => request('/lounges', { method: 'POST', body: JSON.stringify(data) }), // V2
   joinLounge: (id) => request(`/lounges/${id}/join`, { method: 'POST' }),

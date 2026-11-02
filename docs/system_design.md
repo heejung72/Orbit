@@ -94,7 +94,9 @@ sequenceDiagram
 | `guest:session:{sha256(token)}` | Hash | guestId, nickname, avatarId, avatarEmoji, expiresAt (토큰 원본은 저장하지 않음) | expiresAt까지 (#5) |
 | `guest:id:{guestId}` | String | 세션 키 (역조회, 강제 종료용) | 동일 (#12에서 추가) |
 | `guest:tastes:{guestId}` | Hash | tagId → weight (저장 시 DEL+HSET+PEXPIREAT를 MULTI로, `DELETE /guest/session` 시 함께 삭제) | 동일 (#7) |
-| `guest:rooms:{guestId}` | Set | 참여 중인 roomId | 동일 |
+| `guest:rooms:{guestId}` | Set | 참여 중인 1:1 roomId | 동일 (#13) |
+| `guest:lounges:{guestId}` | Set | 참여한 loungeId | 동일 (#11) |
+| `lounge:{loungeId}:guests` | Sorted Set | guestId, score = 세션 expiresAt. 인원 계산 시 score > now만 셈, 참여 때 만료분 정리 | 마지막 참여 후 30분 (#11) |
 | `room:{roomId}:guestmsgs` | List | Guest 메시지 JSON(작성자 `guestId`·`expiresAt` 포함, 최근 500개). 읽을 때 만료된 작성자 메시지 제외 (#10) | 마지막 Guest 메시지 후 30분. 만료 즉시 삭제는 #12 |
 | `guest:answers:{guestId}` | Hash | questionId → 답변 | 동일 |
 | `guest:msgcount:{guestId}` | String | 보낸 메시지 수 (가입 유도 트리거) | 동일 |
@@ -124,7 +126,7 @@ sequenceDiagram
    - users 생성
    - `guest:tastes` → `user_tastes` INSERT
    - `guest:rooms`의 방(Redis 임시방) → 상대가 **회원**이면 `chat_rooms`(direct) + `chat_members` 2행을 PG에 새로 생성 / 상대가 **Guest**면 방은 Redis에 그대로 두고 본인만 회원으로 표시 (#14에서 확정)
-   - 참여 중인 라운지 → `lounge_members` INSERT
+   - `guest:lounges`의 라운지 → `lounge_members` INSERT, `lounge:{id}:guests`에서 제거
    - `room:{id}:guestmsgs`에서 **가입한 Guest 본인이 보낸 메시지만** → `messages` INSERT (sender = 새 userId)
    - 같은 방의 **Member 메시지**는 원래 작성자(sender_id)를 그대로 유지한다 (이미 PG에 있으면 그대로, Redis에 있으면 원 작성자로 INSERT)
    - **다른 Guest(가입하지 않은 상대)의 메시지는 PostgreSQL로 이전하지 않는다** — Guest 메시지 보관 정책 유지. 해당 Guest 만료 시 Redis에서 삭제
@@ -137,7 +139,7 @@ sequenceDiagram
 ## 5. 실시간(Socket.io) 이벤트
 
 - **연결 인증**: `auth.token`(회원 JWT) 또는 `auth.guestToken`(Guest). 거절 시 `connect_error`의 `data.code` = `UNAUTHORIZED` / `GUEST_EXPIRED` / `UNAVAILABLE`
-- **Guest는 모든 이벤트 처리 전** 세션을 다시 확인하고, 만료(시간·직접 종료)면 `guest:expired`를 보낸 뒤 연결을 끊는다 (#10). 소켓별 만료 타이머·5분 전 알림은 #12
+- **Guest는 모든 이벤트 처리 전** 세션을 다시 확인하고, 만료(시간·직접 종료)면 `guest:expired`를 보낸 뒤 연결을 끊는다 (#10). 이벤트가 없어도 **소켓별 만료 타이머**가 `expiresAt`에 같은 처리를 한다 (#11, PR #28). 5분 전 알림·누락 소켓 정리 스케줄러는 #12
 - **결과·오류는 ack 콜백** `{ ok: true, ... }` / `{ ok: false, code, message }` (`ROOM_NOT_FOUND`, `ROOM_CLOSED`, `INVALID_MESSAGE`, `UNAVAILABLE`, `SERVER_ERROR`)
 
 | 방향 | 이벤트 | payload | 설명 |
@@ -148,8 +150,8 @@ sequenceDiagram
 | C→S | `typing` | `{roomId}` | 입력 중 (같은 방의 다른 소켓에게 `typing {roomId}`) |
 | S→C | `message:new` | `{id, room_id, content, created_at, is_mine, is_guest, sender_nickname, sender_avatar_emoji}` | 새 메시지. `is_mine`은 받는 소켓마다 계산, 만료된 Guest 수신자는 받지 않고 종료 |
 | S→C | `typing` | `{roomId}` | 상대 입력 중 |
-| S→C | `guest:expired` | `{}` | 만료, 서버가 연결 종료 (#10 이벤트 시점, #12 타이머) |
-| S→C | `room:presence` | `{roomId, count}` | 라운지 참여 인원 (#11) |
+| S→C | `guest:expired` | `{}` | 만료, 서버가 연결 종료 (#10 이벤트 시점, #11 소켓 타이머) |
+| S→C | `room:presence` | `{roomId, count}` | 라운지 채팅방에 **지금 접속 중인 사람 수**(같은 사람 여러 기기는 1명). 입장·퇴장·연결 끊김 때 방 전체에 전송 (#11) |
 | S→C | `match:request` / `match:accepted` | `{matchId, ...}` | 매칭 (#13) |
 | S→C | `guest:warning` | `{remainingSec: 300}` | 만료 5분 전 (#12) |
 | S→C | `signup:nudge` | `{reason}` | 메시지 수 기준 가입 유도 (#14) |

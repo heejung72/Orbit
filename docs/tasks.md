@@ -18,8 +18,8 @@
 | 7 | [FEAT] 취향 시스템 | `feat/#7-taste-system` | 4, 5 | ✅ |
 | 8 | [FEAT] Orbit Dashboard (Home) | `feat/#8-dashboard` | 7 | ✅ |
 | 9 | [FEAT] 하단 탭 네비게이션 | - | - | 닫음 (탭 구조는 #2, 디자인은 #24, Guest My Orbit은 #17) |
-| 10 | [FEAT] Socket.io 실시간 채팅 기반 | `feat/#10-socket-chat` | 4, 5 | 🟨 |
-| 11 | [FEAT] 취향 라운지 | `feat/#11-lounge` | 10 | ⬜ |
+| 10 | [FEAT] Socket.io 실시간 채팅 기반 | `feat/#10-socket-chat` | 4, 5 | ✅ |
+| 11 | [FEAT] 취향 라운지 | `feat/#11-lounge` | 10 | 🟨 |
 | 12 | [FEAT] Guest Time Attack | `feat/#12-guest-time-attack` | 5, 10 | ⬜ |
 | 13 | [FEAT] 1:1 취향 매칭 | `feat/#13-matching` | 7, 10 | ⬜ |
 | 14 | [FEAT] Guest → 회원 전환 | `feat/#14-guest-upgrade` | 12, 13 | ⬜ |
@@ -215,15 +215,26 @@
 - 하지 않은 것: 만료 타이머·5분 전 알림 → #12 / 라운지 참여·`room:presence` → #11 / Guest 1:1 방·온라인 상태 → #13 / 가입 유도 배너(이전 5개마다 표시하던 것 제거) → #14 / Rate Limit·차단 → #16
 
 ## #11 [FEAT] 취향 라운지
-- [ ] `GET /lounges`, `/lounges/recommended`, `/lounges/:id`, `/lounges/:id/messages`
-- [ ] 실시간 인원 `room:presence`
-- [ ] Guest 라운지 참여는 Redis(TTL)로만 관리, `lounge_members`(PG)에는 회원만 기록 — PR #19 CodeRabbit 지적
-- [ ] LoungeList (카테고리 필터, 인기순), LoungeChat (그룹 채팅)
-- [ ] Home의 Active Lounges 연결
+### Backend
+- [x] `services/loungeMembers.js`: 회원 PG / Guest Redis(`guest:lounges`, `lounge:{id}:guests` score = expiresAt) 참여·퇴장·참여 여부·Guest 인원
+- [x] `POST /lounges/:id/join` Guest 허용, 정원(Guest 포함) 라운지 행 잠금, 이미 참여 중이면 200
+- [x] 목록·상세·Home `member_count`에 Guest 포함, `is_member`, 상세 `guest_count`
+- [x] `GET /lounges/recommended` (대표 태그 겹침 × 중요도 × 2 + 카테고리 점수)
+- [x] 소켓 `room:presence` (입장·퇴장·끊김, 같은 사람 여러 기기 1명), 퇴장·입력 중도 UUID 정규화
+- [x] Guest 소켓별 만료 타이머 (원래 #12, PR #28 리뷰로 당김)
+- [x] `GET /chat/rooms` Guest 라운지 탭, Guest 직접 종료 시 라운지에서 제거
+- [x] Redis 끊김: 회원은 회원 수만으로 계속 동작
+- [x] `tests/lounges.e2e.js` + `npm run test:lounges` (8개)
+
+### Frontend
+- [x] LoungeList: 검색, 카테고리 칩, 내 취향 추천(필터·검색 중엔 숨김), 인원·참여 중 표시
+- [x] 라운지 상세: 참여/나가기(Guest도), 대표 태그, 회원 참여자 + "Guest N명", 그룹 채팅
+- [x] ChatRoom(라운지): "지금 N명이 대화 중" 실시간
+- 하지 않은 것: 라운지 만들기 → V2 / Home 추천 섹션 / Guest 참여 이전 → #14 / 라운지 신고·강퇴 → #16 / 우주 테마 → #24
 
 ## #12 [FEAT] Guest Time Attack
 - [ ] `GuestTimer` 컴포넌트 (mm:ss, 5분 이하 강조색)
-- [ ] 소켓별 만료 타이머 (`expiresAt - now`): `guest:expired` **전송 후** disconnect → 방 퇴장 브로드캐스트 → Redis 정리
+- [x] 소켓별 만료 타이머 (`expiresAt - now`): `guest:expired` **전송 후** disconnect → 방 인원 갱신 — #11(PR #28)에서 완료. 남은 것: 만료 시 Redis 데이터 즉시 정리
 - [ ] 보조 스케줄러 `jobs/guestExpiry.js` (30초 주기): 타이머에서 누락된 소켓·키 정리
 - [ ] `guest:warning`(5분 전), `guest:expired` 이벤트
 - [ ] 앱: 만료 시 토큰 삭제 → "궤도가 사라졌어요" 화면 → Welcome

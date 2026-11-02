@@ -3,10 +3,10 @@
 > **작업을 다시 시작할 때 이 파일부터 읽는다.** 작업이 끝날 때마다 갱신한다.
 
 ## 🔖 지금 상태
-- **현재 이슈:** #10 [FEAT] Socket.io 실시간 채팅 기반 — `feat/#10-socket-chat`
+- **현재 이슈:** #11 [FEAT] 취향 라운지 — `feat/#11-lounge`
 - **상태:** 구현·셀프 리뷰 완료 → PR 리뷰
-- **다음 할 일:** #10 머지 → #11 취향 라운지 (우주 테마 `style/#24-space-theme`는 기능 이슈 뒤로 보류)
-- **로컬 준비물:** PostgreSQL + Redis, `src/backend`에서 `npm install`(socket.io-client 추가됨), 테스트는 `npm run test:auth`, `test:guest`, `test:tastes`, `test:home`, `test:chat` (서버 실행 중)
+- **다음 할 일:** #11 머지 → #12 Guest Time Attack (우주 테마 `style/#24-space-theme`는 기능 이슈 뒤로 보류)
+- **로컬 준비물:** PostgreSQL + Redis, `src/backend`에서 `npm install`(socket.io-client 추가됨), 테스트는 `npm run test:auth`, `test:guest`, `test:tastes`, `test:home`, `test:chat`, `test:lounges` (서버 실행 중)
 
 ## ✅ 완료한 이슈
 | # | 제목 | PR | 머지일 |
@@ -19,6 +19,7 @@
 | 6 | [FEAT] Welcome 화면 | #23 | 2026-11-02 |
 | 7 | [FEAT] 취향 시스템 | #25 | 2026-11-02 |
 | 8 | [FEAT] Orbit Dashboard (Home) | #26 | 2026-11-02 |
+| 10 | [FEAT] Socket.io 실시간 채팅 기반 | #27 | 2026-11-03 |
 
 ## 📌 결정 로그
 | 날짜 | 결정 | 근거/비고 |
@@ -75,6 +76,11 @@
 | 2026-11-02 | 라운지 방은 회원·Guest 모두 열람·전송 (참여는 목록·알림용) | 기존 회원 규칙과 동일하게. 참여 기능은 #11 |
 | 2026-11-02 | Guest 메시지 Redis 리스트: 최근 500개, 키 TTL 30분, 읽을 때 만료 작성자 제외 | 만료 즉시 삭제는 #12. Redis 끊김 시 회원은 회원 메시지만으로 기록 조회 |
 | 2026-11-02 | 온라인 상태(`online:actors`)는 #13으로 | 쓰는 곳(매칭 후보)이 생길 때 만든다 |
+| 2026-11-03 | 라운지 Guest 참여는 Redis Set + Sorted Set(score = expiresAt), PG에는 회원만 | #11. 만료 Guest는 score로 걸러 즉시 인원에서 빠짐 |
+| 2026-11-03 | `member_count` = 참여자(회원+Guest), `room:presence` = 지금 채팅방 접속 인원 | 참여(목록·알림용)와 접속(실시간)을 구분 |
+| 2026-11-03 | 라운지 추천 = 대표 태그 겹침 × 중요도 × 2 + 카테고리 점수, LoungeList 상단에 표시 | #11. Home 추천 섹션은 보류 |
+| 2026-11-03 | 라운지 전용 메시지 API(`/lounges/:id/messages`) 두지 않음 | `/chat/rooms/:id/messages`와 중복 |
+| 2026-11-03 | Guest 소켓별 만료 타이머를 #12에서 #11로 당김 | PR #28 CodeRabbit. 이벤트 없는 만료 Guest가 접속 인원에 남던 문제. #12에는 5분 전 알림·정리 스케줄러·카운트다운만 남음 |
 | 2026-11-02 | 태그별 이미지(앨범 커버 등)는 #7에서 제외 → 별도 이슈 | 공식 API URL + 출처 표시 방식으로 추후 |
 
 ## ❓ 미결정 사항

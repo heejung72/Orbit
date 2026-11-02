@@ -1,13 +1,14 @@
 const { verifyMemberToken } = require('../middleware/memberAuth');
 const { findGuestSession } = require('../services/guestSession');
 const { getRoomForActor } = require('../services/chatAccess');
+const { toUuid } = require('../utils/validate');
 const { normalizeContent, saveMessage, toClient } = require('../services/chat');
 
 // Socket.io — docs/system_design.md §5
-// C→S: room:join · room:leave · message:send · typing  /  S→C: message:new · typing · guest:expired
+// C→S: room:join · room:leave · message:send · typing  /  S→C: message:new · typing · guest:expired · room:presence
 // 결과·오류는 ack 콜백 { ok, code?, message? } 로 돌려준다
 // 메시지 본문은 어떤 로그에도 남기지 않는다 (오류 로그는 err.message만)
-// TODO(#12): 소켓별 만료 타이머·5분 전 알림 / TODO(#16): message:send Rate Limit
+// TODO(#12): 5분 전 알림(guest:warning)·누락 소켓 정리 스케줄러 / TODO(#16): message:send Rate Limit
 
 const authError = (code) => Object.assign(new Error(code), { data: { code } });
 const fail = (code, message) => ({ ok: false, code, message });
@@ -17,6 +18,18 @@ const isExpiredGuest = (actor) => actor.type === 'guest' && !(actor.expiresAt > 
 function expire(socket) {
   socket.emit('guest:expired', {});
   socket.disconnect(true);
+}
+
+// 라운지 방에 지금 접속 중인 사람 수(같은 사람의 여러 기기는 1명)를 방 전체에 알린다 (#11)
+// 인원 표시는 부가 정보라 실패해도 원래 요청(입장·퇴장)의 결과에는 영향을 주지 않는다
+function broadcastPresence(io, roomId) {
+  io.in(roomId)
+    .fetchSockets()
+    .then((sockets) => {
+      const count = new Set(sockets.map((s) => `${s.data.actor.type}:${s.data.actor.id}`)).size;
+      io.to(roomId).emit('room:presence', { roomId, count });
+    })
+    .catch((err) => console.error('presence 갱신 실패:', err.message));
 }
 
 // 이벤트 핸들러 공통: payload 기본값, ack가 없어도 동작, 예외는 SERVER_ERROR
@@ -56,6 +69,16 @@ function setupSocket(io) {
 
   io.on('connection', (socket) => {
     const { actor } = socket.data;
+    const loungeRooms = new Set(); // 이 소켓이 들어가 있는 라운지 방 (퇴장·끊김 때 인원 갱신용)
+
+    // Guest는 만료 시각에 바로 종료 — 이벤트를 보내지 않는 Guest도 접속 인원에서 빠지게 (끊김 → 아래 disconnect에서 인원 갱신)
+    const expiryTimer = actor.type === 'guest' ? setTimeout(() => expire(socket), Math.max(actor.expiresAt - Date.now(), 0)) : null;
+
+    // 연결이 끊기면(방에서 이미 빠진 뒤) 들어가 있던 라운지 방 인원 갱신
+    socket.on('disconnect', () => {
+      clearTimeout(expiryTimer);
+      for (const roomId of loungeRooms) broadcastPresence(io, roomId);
+    });
 
     // 모든 이벤트 처리 전 Guest 세션 재확인 (시간 만료·직접 종료·Redis 정리 모두 여기서 걸림)
     socket.use(async (packet, next) => {
@@ -74,11 +97,17 @@ function setupSocket(io) {
       if (!room) return reply(fail('ROOM_NOT_FOUND', '채팅방에 들어갈 수 없어요'));
       socket.join(room.id);
       reply({ ok: true });
+      if (room.type === 'lounge') {
+        loungeRooms.add(room.id);
+        broadcastPresence(io, room.id);
+      }
     }));
 
     socket.on('room:leave', handle(async ({ roomId }, reply) => {
-      if (typeof roomId === 'string') socket.leave(roomId);
+      const id = toUuid(roomId); // room:join과 같은 소문자 UUID로
+      if (id) socket.leave(id);
       reply({ ok: true });
+      if (id && loungeRooms.delete(id)) broadcastPresence(io, id);
     }));
 
     socket.on('message:send', handle(async ({ roomId, content }, reply) => {
@@ -102,7 +131,8 @@ function setupSocket(io) {
     }));
 
     socket.on('typing', handle(async ({ roomId }) => {
-      if (typeof roomId === 'string' && socket.rooms.has(roomId)) socket.to(roomId).emit('typing', { roomId });
+      const id = toUuid(roomId);
+      if (id && socket.rooms.has(id)) socket.to(id).emit('typing', { roomId: id });
     }));
   });
 }

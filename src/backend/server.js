@@ -36,7 +36,7 @@ app.use('/api/guest', guestRoutes); // #5
 // 회원 + Guest (Guest 요청엔 req.userId가 없음 → 라우트에서 req.isGuest로 분기)
 app.use('/api/home', optionalAuth, homeRoutes); // #8
 app.use('/api/tastes', optionalAuth, tasteRoutes);
-app.use('/api/lounges', optionalAuth, loungeRoutes); // Guest: 읽기만, 참여는 #11
+app.use('/api/lounges', optionalAuth, loungeRoutes); // #11: Guest 참여는 Redis
 app.use('/api/questions', optionalAuth, questionRoutes); // #15
 app.use('/api/chat', optionalAuth, chatRoutes); // #10: 1:1 목록은 회원만, 기록 조회는 Guest도
 

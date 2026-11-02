@@ -1,86 +1,158 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, FlatList, StyleSheet, Alert } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, Pressable, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { api } from '../../services/api';
+import Avatar from '../../components/Avatar';
+import { colors, spacing, radius, typography } from '../../theme';
+
+// 라운지 상세: 소개·대표 태그·참여/나가기(회원·Guest)·그룹 채팅 입장·참여자 (#11)
+const messageOf = (err) => (err instanceof TypeError ? '서버에 연결할 수 없어요' : err.message);
 
 export default function LoungeChatScreen({ route, navigation }) {
   const { loungeId } = route.params;
   const [lounge, setLounge] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    api.getLounge(loungeId).then(data => {
+  const load = useCallback(async () => {
+    setError('');
+    try {
+      const data = await api.getLounge(loungeId);
       setLounge(data);
       navigation.setOptions({ title: data.name });
-    }).catch(() => {});
-  }, [loungeId]);
-
-  const handleJoin = async () => {
-    try {
-      await api.joinLounge(loungeId);
-      Alert.alert('참여 완료', '라운지에 참여했어요!');
-      api.getLounge(loungeId).then(setLounge);
     } catch (err) {
-      Alert.alert('오류', err.message);
+      setError(messageOf(err));
+    }
+  }, [loungeId, navigation]);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const toggleJoin = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      if (lounge.is_member) await api.leaveLounge(loungeId);
+      else await api.joinLounge(loungeId);
+      await load();
+    } catch (err) {
+      setError(messageOf(err));
+    } finally {
+      setBusy(false);
     }
   };
 
-  if (!lounge) return <Text style={styles.loading}>로딩 중...</Text>;
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.name}>{lounge.name}</Text>
-        <Text style={styles.category}>{lounge.category_name} · {lounge.member_count}명</Text>
-        <Text style={styles.description}>{lounge.description}</Text>
+  if (!lounge) {
+    return (
+      <View style={styles.center}>
+        {error ? (
+          <>
+            <Text style={styles.muted}>{error}</Text>
+            <Pressable onPress={load} accessibilityRole="button" style={styles.retry}>
+              <Text style={styles.link}>다시 시도</Text>
+            </Pressable>
+          </>
+        ) : (
+          <ActivityIndicator color={colors.primary} />
+        )}
       </View>
+    );
+  }
 
-      <View style={styles.actions}>
-        <TouchableOpacity style={styles.joinButton} onPress={handleJoin} disabled={lounge.is_member}>
-          <Text style={styles.joinText}>{lounge.is_member ? '참여 중' : '참여하기'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.chatButton, !lounge.chat_room_id && styles.chatButtonDisabled]}
-          disabled={!lounge.chat_room_id}
-          onPress={() => navigation.navigate('ChatRoom', { roomId: lounge.chat_room_id, title: lounge.name, type: 'lounge' })}
-        >
-          <Text style={styles.chatText}>{lounge.chat_room_id ? '그룹 채팅' : '채팅 준비 중'}</Text>
-        </TouchableOpacity>
-      </View>
-
-      <Text style={styles.sectionTitle}>멤버 ({lounge.members?.length || 0})</Text>
-      <FlatList
-        data={lounge.members || []}
-        keyExtractor={(item, index) => `${index}-${item.joined_at}`}
-        renderItem={({ item }) => (
-          <View style={styles.member}>
-            <View style={styles.memberAvatar}>
-              <Text style={styles.memberAvatarText}>{item.nickname[0]}</Text>
-            </View>
-            <Text style={styles.memberName}>{item.nickname}</Text>
+  const header = (
+    <View>
+      <View style={styles.card}>
+        <Text style={styles.icon}>{lounge.icon || lounge.category_icon}</Text>
+        <Text style={styles.name} accessibilityRole="header">{lounge.name}</Text>
+        <Text style={styles.meta}>{lounge.category_name} · {lounge.member_count}명 참여</Text>
+        {lounge.description ? <Text style={styles.desc}>{lounge.description}</Text> : null}
+        {lounge.tags.length > 0 && (
+          <View style={styles.tags}>
+            {lounge.tags.map((t) => (
+              <Text key={t.id} style={styles.tag}>{t.name}</Text>
+            ))}
           </View>
         )}
-      />
+      </View>
+
+      {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
+
+      <View style={styles.actions}>
+        <Pressable
+          style={[styles.button, lounge.is_member ? styles.outline : styles.primary, busy && styles.disabled]}
+          onPress={toggleJoin}
+          disabled={busy}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.buttonText, lounge.is_member ? styles.outlineText : styles.primaryText]}>
+            {lounge.is_member ? '나가기' : '참여하기'}
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.button, styles.primary, !lounge.chat_room_id && styles.disabled]}
+          disabled={!lounge.chat_room_id}
+          onPress={() => navigation.navigate('ChatRoom', { roomId: lounge.chat_room_id, title: lounge.name, type: 'lounge' })}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.buttonText, styles.primaryText]}>{lounge.chat_room_id ? '그룹 채팅' : '채팅 준비 중'}</Text>
+        </Pressable>
+      </View>
+
+      <Text style={styles.sectionTitle} accessibilityRole="header">참여자</Text>
+      {lounge.guest_count > 0 && <Text style={styles.muted}>둘러보는 Guest {lounge.guest_count}명도 함께하고 있어요</Text>}
     </View>
+  );
+
+  return (
+    <FlatList
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      data={lounge.members}
+      keyExtractor={(item, index) => `${index}-${item.joined_at}`}
+      ListHeaderComponent={header}
+      ListEmptyComponent={lounge.guest_count === 0 ? <Text style={styles.muted}>첫 번째 참여자가 되어보세요</Text> : null}
+      renderItem={({ item }) => (
+        <View style={styles.member}>
+          <Avatar emoji={item.avatar_emoji} size={36} label={`${item.nickname}의 캐릭터`} />
+          <Text style={styles.memberName}>{item.nickname}</Text>
+        </View>
+      )}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
-  loading: { textAlign: 'center', marginTop: 40, color: '#888' },
-  header: { backgroundColor: '#fff', padding: 20, borderBottomWidth: 1, borderBottomColor: '#EEE' },
-  name: { fontSize: 24, fontWeight: 'bold', color: '#333' },
-  category: { fontSize: 14, color: '#6C5CE7', marginTop: 4 },
-  description: { fontSize: 15, color: '#666', marginTop: 10, lineHeight: 22 },
-  owner: { fontSize: 13, color: '#888', marginTop: 8 },
-  actions: { flexDirection: 'row', padding: 16, gap: 10 },
-  joinButton: { flex: 1, backgroundColor: '#6C5CE7', borderRadius: 12, padding: 14, alignItems: 'center' },
-  joinText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-  chatButton: { flex: 1, backgroundColor: '#E8E5FF', borderRadius: 12, padding: 14, alignItems: 'center' },
-  chatButtonDisabled: { opacity: 0.5 },
-  chatText: { color: '#6C5CE7', fontWeight: 'bold', fontSize: 15 },
-  sectionTitle: { fontSize: 17, fontWeight: 'bold', marginLeft: 16, marginTop: 8, marginBottom: 8, color: '#333' },
-  member: { flexDirection: 'row', alignItems: 'center', padding: 12, paddingHorizontal: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F5F5F5' },
-  memberAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#6C5CE7', justifyContent: 'center', alignItems: 'center' },
-  memberAvatarText: { color: '#fff', fontWeight: 'bold' },
-  memberName: { fontSize: 15, marginLeft: 10, flex: 1, color: '#333' },
-  badge: { backgroundColor: '#FFD93D', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, fontSize: 12, fontWeight: 'bold' },
+  container: { flex: 1, backgroundColor: colors.background },
+  content: { padding: spacing.md, paddingBottom: spacing.xl },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, padding: spacing.lg },
+  muted: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm },
+  link: { ...typography.body, color: colors.primary },
+  retry: { marginTop: spacing.md, padding: spacing.sm },
+  error: { ...typography.caption, color: colors.primary, marginBottom: spacing.sm },
+
+  card: {
+    backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.md,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  icon: { ...typography.title, marginBottom: spacing.xs },
+  name: { ...typography.title, color: colors.text },
+  meta: { ...typography.caption, color: colors.primary, marginTop: spacing.xs },
+  desc: { ...typography.body, color: colors.text, marginTop: spacing.sm },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.md },
+  tag: {
+    ...typography.caption, color: colors.primary, borderWidth: 1, borderColor: colors.primary,
+    borderRadius: radius.lg, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs,
+  },
+
+  actions: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
+  button: { flex: 1, borderRadius: radius.md, padding: spacing.md, alignItems: 'center', borderWidth: 1, borderColor: colors.primary },
+  primary: { backgroundColor: colors.primary },
+  outline: { backgroundColor: colors.surface },
+  disabled: { opacity: 0.4 },
+  buttonText: { ...typography.body, fontWeight: 'bold' },
+  primaryText: { color: colors.onPrimary },
+  outlineText: { color: colors.primary },
+
+  sectionTitle: { ...typography.body, fontWeight: 'bold', color: colors.text, marginBottom: spacing.sm },
+  member: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
+  memberName: { ...typography.body, color: colors.text },
 });
