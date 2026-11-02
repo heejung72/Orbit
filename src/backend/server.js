@@ -38,11 +38,11 @@ app.use('/api/home', optionalAuth, homeRoutes); // #8
 app.use('/api/tastes', optionalAuth, tasteRoutes);
 app.use('/api/lounges', optionalAuth, loungeRoutes); // Guest: 읽기만, 참여는 #11
 app.use('/api/questions', optionalAuth, questionRoutes); // #15
+app.use('/api/chat', optionalAuth, chatRoutes); // #10: 1:1 목록은 회원만, 기록 조회는 Guest도
 
 // 회원 전용 — 각 기능 이슈에서 Guest 지원 시 optionalAuth로 전환
-// users #17, chat #10, matching #13, reports #16
+// users #17, matching #13, reports #16
 app.use('/api/users', memberAuth, userRoutes);
-app.use('/api/chat', memberAuth, chatRoutes);
 app.use('/api/matching', memberAuth, matchingRoutes);
 app.use('/api/reports', memberAuth, reportRoutes);
 
