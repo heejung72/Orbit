@@ -3,10 +3,10 @@
 > **작업을 다시 시작할 때 이 파일부터 읽는다.** 작업이 끝날 때마다 갱신한다.
 
 ## 🔖 지금 상태
-- **현재 이슈:** #6 [FEAT] Welcome 화면 — `feat/#6-welcome`
+- **현재 이슈:** #7 [FEAT] 취향 시스템 — `feat/#7-taste-system`
 - **상태:** 구현·셀프 리뷰 완료 → PR 리뷰
-- **다음 할 일:** #6 머지 → `feat/#9-tab-navigation` → 첫 커밋으로 #6 완료 반영
-- **로컬 준비물:** PostgreSQL + Redis, 테스트는 `npm run test:auth`, `npm run test:guest` (서버 실행 중)
+- **다음 할 일:** #7 머지 → #9 또는 #8 (우주 테마 `style/#24-space-theme`는 기능 이슈 뒤로 보류)
+- **로컬 준비물:** PostgreSQL + Redis, 테스트는 `npm run test:auth`, `test:guest`, `test:tastes` (서버 실행 중)
 
 ## ✅ 완료한 이슈
 | # | 제목 | PR | 머지일 |
@@ -16,6 +16,7 @@
 | 3 | [REFACTOR] 스키마 재설계 | #20 | 2026-10-31 |
 | 5 | [FEAT] Guest 세션 | #21 | 2026-10-31 |
 | 4 | [FEAT] 회원 인증 | #22 | 2026-10-31 |
+| 6 | [FEAT] Welcome 화면 | #23 | 2026-11-02 |
 
 ## 📌 결정 로그
 | 날짜 | 결정 | 근거/비고 |
@@ -59,6 +60,11 @@
 | 2026-10-31 | **PR 올리기 전 ponytail-review 셀프 리뷰 필수** | CodeRabbit 왕복 줄이기 (PR #20에서 3라운드) |
 | 2026-10-31 | CodeRabbit 리뷰 반영 커밋은 항상 **`[FIX]`** | 이슈 타입과 무관 |
 | 2026-10-31 | 이슈·커밋·PR 제목은 **`[TYPE]` 대문자 대괄호** 형식 | 예: `[FEAT] #5 Guest 세션 발급 API 추가`. 브랜치만 소문자 |
+| 2026-11-02 | 우주 테마는 `style/#24-space-theme`에 보관, **기능 이슈 먼저** | 나중에 main과 합칠 때 화면 파일 충돌 정리 필요 |
+| 2026-11-02 | 취향 **3~20개**, 중요도 기본값 2 | #7. 서버·앱 같은 규칙 |
+| 2026-11-02 | Guest 취향은 세션과 **같은 시각에 만료**, 직접 종료 시 함께 삭제 | #7 |
+| 2026-11-02 | 회원 취향 저장은 `users` 행 **FOR UPDATE**로 직렬화 | PR #25 CodeRabbit. 동시 저장 시 목록이 합쳐지던 문제(30회 중 24회 재현) |
+| 2026-11-02 | 태그별 이미지(앨범 커버 등)는 #7에서 제외 → 별도 이슈 | 공식 API URL + 출처 표시 방식으로 추후 |
 
 ## ❓ 미결정 사항
 | 항목 | 결정 예정 이슈 |
@@ -71,9 +77,8 @@
 - 기존 뼈대(TasteMate, 음식 취향 앱 기준)는 `main` 첫 커밋에 남아 있음 — 참고용
 - frontend 임시 아이콘(`assets/*.png`)은 #2에서 만든 placeholder — 정식 디자인은 #8
 - ⚠️ **#3 이후 로컬 DB는 초기화 필요**: `cd src/backend && npm run db:setup` (기존 TasteMate 테이블과 호환 안 됨)
-- 임시 API 형태(#3에서 유지): `POST /matching/find`, `PUT /users/me/tastes` 등은 각 기능 이슈(#7, #13)에서 api_spec 형태로 교체
+- 임시 API 형태(#3에서 유지): `POST /matching/find` 등은 #13에서 api_spec 형태로 교체 (`PUT /users/me/tastes`는 #7에서 `/tastes/me`로 교체 완료)
 - 메시지(REST·소켓)는 `is_mine`만 내려줌(실제 user_id 제거, PR #20). 매칭 후보 `id`는 아직 실제 user_id → #13에서 익명 참조로 교체
 - 소켓 `send_message` Rate Limit 없음 → #16에서 Redis 기반으로 추가
 - ⚠️ **Guest는 HTTP까지만 목표 설계와 같음**: Redis 30분 세션은 #5에서 구현. 소켓 Guest·Guest 채팅(#10), 만료 카운트다운·`guest:expired`(#12)는 아직 없음
 - `src/backend/.env`는 git 제외됨. 새 환경에서는 `.env.example` 복사
-- GitHub 이슈 #17(My Orbit) 아직 미등록

@@ -1,1 +1,1 @@
-export { default } from './TasteTags';
+export { default, WEIGHT_LABELS } from './TasteTags';

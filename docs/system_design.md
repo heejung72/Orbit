@@ -93,7 +93,7 @@ sequenceDiagram
 |---|---|---|---|
 | `guest:session:{sha256(token)}` | Hash | guestId, nickname, avatarId, avatarEmoji, expiresAt (토큰 원본은 저장하지 않음) | expiresAt까지 (#5) |
 | `guest:id:{guestId}` | String | 세션 키 (역조회, 강제 종료용) | 동일 (#12에서 추가) |
-| `guest:tastes:{guestId}` | Hash | tagId → weight | 동일 |
+| `guest:tastes:{guestId}` | Hash | tagId → weight (저장 시 DEL+HSET+PEXPIREAT를 MULTI로, `DELETE /guest/session` 시 함께 삭제) | 동일 (#7) |
 | `guest:rooms:{guestId}` | Set | 참여 중인 roomId | 동일 |
 | `room:{roomId}:guestmsgs` | List | Guest가 포함된 1:1 방 / 라운지의 Guest 메시지 JSON | 해당 guest 만료 시 정리 |
 | `guest:answers:{guestId}` | Hash | questionId → 답변 | 동일 |

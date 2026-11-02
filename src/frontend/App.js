@@ -22,7 +22,7 @@ export default function App() {
     entering.current = true;
     try {
       const me = await api.me();
-      setNeedsTaste(me.type === 'member' && !me.has_tastes); // Guest 취향 온보딩은 #7
+      setNeedsTaste(!me.has_tastes); // 회원·Guest 모두 취향 0개면 TasteSelect부터
       setAuthState(me.type);
     } catch (err) {
       if (err.code === 'UNAUTHORIZED' || err.code === 'GUEST_EXPIRED') {

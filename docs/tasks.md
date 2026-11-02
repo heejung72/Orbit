@@ -14,8 +14,8 @@
 | 3 | [REFACTOR] 스키마 재설계 | `refactor/#3-db-schema` | 2 | ✅ |
 | 4 | [FEAT] 회원 인증 | `feat/#4-member-auth` | 5 | ✅ |
 | 5 | [FEAT] Guest 세션 | `feat/#5-guest-session` | 3 | ✅ |
-| 6 | [FEAT] Welcome 화면 | `feat/#6-welcome` | 4, 5 | 🟨 |
-| 7 | [FEAT] 취향 시스템 | `feat/#7-taste-system` | 4, 5 | ⬜ |
+| 6 | [FEAT] Welcome 화면 | `feat/#6-welcome` | 4, 5 | ✅ |
+| 7 | [FEAT] 취향 시스템 | `feat/#7-taste-system` | 4, 5 | 🟨 |
 | 8 | [FEAT] Orbit Dashboard (Home) | `feat/#8-dashboard` | 7, 9 | ⬜ |
 | 9 | [FEAT] 하단 탭 네비게이션 | `feat/#9-tab-navigation` | 6 | ⬜ |
 | 10 | [FEAT] Socket.io 실시간 채팅 기반 | `feat/#10-socket-chat` | 4, 5 | ⬜ |
@@ -25,9 +25,9 @@
 | 14 | [FEAT] Guest → 회원 전환 | `feat/#14-guest-upgrade` | 12, 13 | ⬜ |
 | 15 | [FEAT] 오늘의 질문 | `feat/#15-today-question` | 8, 13 | ⬜ |
 | 16 | [FEAT] 신고·차단, 비속어 필터·스팸 Rate Limit | `feat/#16-safety` | 10 | ⬜ |
-| 17 | [FEAT] My Orbit *(GitHub 이슈 미등록 — 등록 필요)* | `feat/#17-my-orbit` | 7, 9 | ⬜ |
+| 17 | [FEAT] My Orbit | `feat/#17-my-orbit` | 7, 9 | ⬜ |
 
-**권장 진행 순서:** 1 → 2 → 3 → **5 → 4** → 6 → 9 → 7 → 8 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17
+**권장 진행 순서:** 1 → 2 → 3 → **5 → 4** → 6 → **7** → 9 → 8 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17
 
 ---
 
@@ -161,10 +161,21 @@
 - 하지 않은 것: Guest 취향 온보딩 → #7 / 만료 안내 문구 → #12 / 정식 디자인 → #8
 
 ## #7 [FEAT] 취향 시스템
-- [ ] `GET /tastes/categories`, `GET/PUT /tastes/me` (Member→PG, Guest→Redis)
-- [ ] TasteSelect: 카테고리 탭 → 태그 칩 다중 선택 → 중요도(3/2/1) 선택
-- [ ] 선택 요약 ("선택한 취향 4개: Oasis · The 1975 · ...")
-- [ ] `TasteTags` 컴포넌트 (Home·MyOrbit 재사용)
+### Backend
+- [x] `services/tastes.js`: 검증(3~20개, weight 1~3, 중복, int4 범위) + 회원 PG / Guest Redis 저장·조회
+- [x] `GET/PUT /api/tastes/me` (`req.actor` 기준), 예전 `PUT /users/me/tastes` 제거
+- [x] Guest 취향: `guest:tastes:{guestId}`, 세션 `expiresAt`에 함께 만료, 존재하지 않는 태그는 PG로 확인 후 400
+- [x] `DELETE /guest/session` 시 취향 키도 삭제
+- [x] `/auth/me` Guest 응답에 `has_tastes`, Redis 끊김 시 503
+- [x] `tastes/categories`의 호환용 `options` 제거 (Home은 `tags` 사용)
+- [x] `tests/tastes.e2e.js` + `npm run test:tastes` (12개)
+
+### Frontend
+- [x] `api.getMyTastes()`, `api.updateTastes([{ tagId, weight }])` → `/tastes/me`
+- [x] TasteSelect: 카테고리 탭(선택 수 표시) → 태그 칩 → 태그별 중요도(관심 있음/좋아함/매우 좋아함), 저장된 취향 불러와 편집
+- [x] 선택 요약(`TasteTags`, 중요도는 ●●○), 3개 미만이면 저장 버튼 비활성, 20개 초과 시 안내, 오류는 화면 안 문구
+- [x] 진입 분기: 회원·Guest 모두 취향 0개면 TasteSelect부터
+- 하지 않은 것: Home 취향 카드·궤도 → #8 / My Orbit 취향 관리 → #17 / Guest 매칭 → #13 / 가입 시 이전 → #14 / 태그 이미지 → 별도 이슈
 
 ## #8 [FEAT] Orbit Dashboard (Home)
 - [ ] `GET /home` 묶음 API

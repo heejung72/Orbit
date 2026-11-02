@@ -60,15 +60,12 @@ export const api = {
   // 프로필
   getProfile: () => request('/users/me'),
   updateProfile: (data) => request('/users/me', { method: 'PUT', body: JSON.stringify(data) }),
-  // tags: [{ tagId, weight(1~3) }] — 중요도 선택 UI는 #7
-  updateTastes: (tagIds) =>
-    request('/users/me/tastes', {
-      method: 'PUT',
-      body: JSON.stringify({ tags: tagIds.map((tagId) => ({ tagId, weight: 2 })) }),
-    }),
 
-  // 취향
+  // 취향 (회원·Guest 공통)
   getCategories: () => request('/tastes/categories'),
+  getMyTastes: () => request('/tastes/me'),
+  // tags: [{ tagId, weight(1~3) }], 3~20개 → 저장된 목록
+  updateTastes: (tags) => request('/tastes/me', { method: 'PUT', body: JSON.stringify({ tags }) }),
 
   // 매칭
   findMatches: () => request('/matching/find', { method: 'POST' }),
