@@ -8,8 +8,10 @@ const { normalizeContent, saveMessage, toClient } = require('../services/chat');
 // C→S: room:join · room:leave · message:send · typing  /  S→C: message:new · typing · guest:expired · room:presence
 // 결과·오류는 ack 콜백 { ok, code?, message? } 로 돌려준다
 // 메시지 본문은 어떤 로그에도 남기지 않는다 (오류 로그는 err.message만)
-// TODO(#12): 5분 전 알림(guest:warning)·누락 소켓 정리 스케줄러 / TODO(#16): message:send Rate Limit
+// Guest: 만료 5분 전 guest:warning, 만료 시각 guest:expired (소켓 타이머) + 30초 정리 작업(jobs/guestExpiry.js)
+// TODO(#16): message:send Rate Limit
 
+const WARNING_MS = (Number(process.env.GUEST_WARNING_MINUTES) || 5) * 60 * 1000;
 const authError = (code) => Object.assign(new Error(code), { data: { code } });
 const fail = (code, message) => ({ ok: false, code, message });
 const isExpiredGuest = (actor) => actor.type === 'guest' && !(actor.expiresAt > Date.now());
@@ -73,10 +75,18 @@ function setupSocket(io) {
 
     // Guest는 만료 시각에 바로 종료 — 이벤트를 보내지 않는 Guest도 접속 인원에서 빠지게 (끊김 → 아래 disconnect에서 인원 갱신)
     const expiryTimer = actor.type === 'guest' ? setTimeout(() => expire(socket), Math.max(actor.expiresAt - Date.now(), 0)) : null;
+    // 만료 5분 전 1회 알림 (연결 시 이미 5분 이하면 바로). 앱은 배너를, #14에서는 가입 유도 모달을 띄운다
+    const warningTimer = actor.type === 'guest'
+      ? setTimeout(
+        () => socket.emit('guest:warning', { remainingSec: Math.max(Math.round((actor.expiresAt - Date.now()) / 1000), 0) }),
+        Math.max(actor.expiresAt - WARNING_MS - Date.now(), 0)
+      )
+      : null;
 
     // 연결이 끊기면(방에서 이미 빠진 뒤) 들어가 있던 라운지 방 인원 갱신
     socket.on('disconnect', () => {
       clearTimeout(expiryTimer);
+      clearTimeout(warningTimer);
       for (const roomId of loungeRooms) broadcastPresence(io, roomId);
     });
 
