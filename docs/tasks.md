@@ -15,8 +15,8 @@
 | 4 | [FEAT] 회원 인증 | `feat/#4-member-auth` | 5 | ✅ |
 | 5 | [FEAT] Guest 세션 | `feat/#5-guest-session` | 3 | ✅ |
 | 6 | [FEAT] Welcome 화면 | `feat/#6-welcome` | 4, 5 | ✅ |
-| 7 | [FEAT] 취향 시스템 | `feat/#7-taste-system` | 4, 5 | 🟨 |
-| 8 | [FEAT] Orbit Dashboard (Home) | `feat/#8-dashboard` | 7, 9 | ⬜ |
+| 7 | [FEAT] 취향 시스템 | `feat/#7-taste-system` | 4, 5 | ✅ |
+| 8 | [FEAT] Orbit Dashboard (Home) | `feat/#8-dashboard` | 7 | 🟨 |
 | 9 | [FEAT] 하단 탭 네비게이션 | `feat/#9-tab-navigation` | 6 | ⬜ |
 | 10 | [FEAT] Socket.io 실시간 채팅 기반 | `feat/#10-socket-chat` | 4, 5 | ⬜ |
 | 11 | [FEAT] 취향 라운지 | `feat/#11-lounge` | 10 | ⬜ |
@@ -27,7 +27,7 @@
 | 16 | [FEAT] 신고·차단, 비속어 필터·스팸 Rate Limit | `feat/#16-safety` | 10 | ⬜ |
 | 17 | [FEAT] My Orbit | `feat/#17-my-orbit` | 7, 9 | ⬜ |
 
-**권장 진행 순서:** 1 → 2 → 3 → **5 → 4** → 6 → **7** → 9 → 8 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17
+**권장 진행 순서:** 1 → 2 → 3 → **5 → 4** → 6 → **7 → 8** → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17
 
 ---
 
@@ -178,11 +178,19 @@
 - 하지 않은 것: Home 취향 카드·궤도 → #8 / My Orbit 취향 관리 → #17 / Guest 매칭 → #13 / 가입 시 이전 → #14 / 태그 이미지 → 별도 이슈
 
 ## #8 [FEAT] Orbit Dashboard (Home)
-- [ ] `GET /home` 묶음 API
-- [ ] `OrbitVisualization`: 중앙 내 캐릭터, 주변 취향 행성(카테고리별), 바깥 궤도 점(비슷한 사람, 온라인은 빛남), 행성 터치 → 해당 카테고리 라운지
-- [ ] Header (인사말, 닉네임, Guest 타이머 자리)
-- [ ] My Taste / Today's Question 카드 / Active Lounges / Quick Action
-- [ ] `theme/` 컬러·폰트 토큰 정의 + `docs/design.md` 작성
+### Backend
+- [x] `GET /api/home` (optionalAuth) → `{ me, tastes, question, lounges }`, user_id·guestId 미노출
+- [x] `services/questions.js`: 오늘의 질문 (publish_date = 오늘(KST) 우선, 없으면 sort_order 순환) — #15 재사용
+- [x] `GET /api/public/home` 제거
+- [x] `tests/home.e2e.js` + `npm run test:home` (7개)
+
+### Frontend
+- [x] Home 재작성: Header(시간대 인사말·닉네임·캐릭터, Guest 종료 시각) → Your Orbit + 빠른 실행 → My Taste → Today's Question → Active Lounges(상위 3)
+- [x] `OrbitVisualization`: 중앙 캐릭터 + 카테고리 행성(취향 수만큼 크게) 60초 1회전, 행성 터치 → 해당 카테고리 라운지
+- [x] `Avatar` 최소 구현(이모지 원), `TodayQuestion` 화면 내비게이터 등록(placeholder)
+- [x] 화면 복귀 시 새로고침(useFocusEffect), 당겨서 새로고침, 오류 화면 안 문구 + 다시 시도
+- [x] 예전 매칭 카드·인기 취향 목록·`_legacy` 차트 import 제거
+- 하지 않은 것: 바깥 궤도 비슷한 사람·온라인 → #13·#10 / Guest 카운트다운 → #12 / 질문 답변 → #15 / 알림 → V2 / 우주 테마·design.md → #24
 
 ## #9 [FEAT] 하단 탭 네비게이션
 - [ ] RootNavigator (Welcome/Auth/Guest 스택 ↔ MainTabs)
