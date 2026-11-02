@@ -8,6 +8,7 @@ import { api } from '../../services/api';
 import VennDiagram from '../../_legacy/components/VennDiagram';
 import RadarChart from '../../_legacy/components/RadarChart';
 import { colors } from '../../theme';
+import { CategoryBadge } from '../../components/Space';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.75;
@@ -201,7 +202,10 @@ export default function HomeScreen({ isGuest }) {
       {tastes.map(cat => (
         cat.options.length > 0 && (
           <View key={cat.id} style={styles.section}>
-            <Text style={styles.sectionTitle}>{cat.icon} {cat.name}</Text>
+            <View style={styles.sectionHead}>
+              <CategoryBadge code={cat.code} size={28} />
+              <Text style={[styles.sectionTitle, styles.sectionTitleInline]}>{cat.name}</Text>
+            </View>
             <FlatList
               data={cat.options}
               renderItem={renderTasteCard}
@@ -224,9 +228,7 @@ export default function HomeScreen({ isGuest }) {
               style={styles.loungeCard}
               onPress={() => navigation.navigate('LoungeChat', { loungeId: lounge.id })}
             >
-              <View style={styles.loungeIcon}>
-                <Text style={styles.loungeIconText}>{lounge.category_icon}</Text>
-              </View>
+              <CategoryBadge categoryId={lounge.category_id} size={44} />
               <View style={styles.loungeInfo}>
                 <Text style={styles.loungeName}>{lounge.name}</Text>
                 <Text style={styles.loungeMeta}>{lounge.category_name} · {lounge.member_count}명</Text>
@@ -245,97 +247,94 @@ export default function HomeScreen({ isGuest }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
+  container: { flex: 1, backgroundColor: colors.background },
 
   // 게스트 배너
   guestBanner: {
-    backgroundColor: '#FFF3E0', padding: 14, margin: 16, marginBottom: 8,
+    backgroundColor: colors.surface, padding: 14, margin: 16, marginBottom: 8,
     borderRadius: 12, alignItems: 'center',
   },
-  guestBannerText: { fontSize: 14, fontWeight: 'bold', color: '#E65100' },
-  guestBannerSub: { fontSize: 12, color: '#BF360C', marginTop: 2 },
+  guestBannerText: { fontSize: 14, fontWeight: 'bold', color: colors.warning },
+  guestBannerSub: { fontSize: 12, color: colors.warning, marginTop: 2 },
 
   // 취향 설정 버튼
   tasteButton: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 14, margin: 16, marginBottom: 8,
-    borderWidth: 2, borderColor: '#6C5CE7', borderStyle: 'dashed', alignItems: 'center',
+    backgroundColor: colors.surfaceSolid, borderRadius: 12, padding: 14, margin: 16, marginBottom: 8,
+    borderWidth: 2, borderColor: colors.primary, borderStyle: 'dashed', alignItems: 'center',
   },
-  tasteButtonText: { color: '#6C5CE7', fontSize: 15, fontWeight: 'bold' },
+  tasteButtonText: { color: colors.primaryLight, fontSize: 15, fontWeight: 'bold' },
 
   // 섹션
   section: { marginTop: 16, paddingHorizontal: 8 },
-  sectionTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 12, marginLeft: 8, color: '#333' },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', marginLeft: 8, marginBottom: 12 },
+  sectionTitleInline: { marginBottom: 0 },
+  sectionTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 12, marginLeft: 8, color: colors.text },
 
   // 매칭 카드 슬라이더
   matchCard: {
-    width: CARD_WIDTH, backgroundColor: '#fff', borderRadius: 16, padding: 16,
+    width: CARD_WIDTH, backgroundColor: colors.surfaceSolid, borderRadius: 16, padding: 16,
     marginHorizontal: CARD_MARGIN,
     shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
   },
   matchCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   avatar: {
-    width: 50, height: 50, borderRadius: 25, backgroundColor: '#6C5CE7',
+    width: 50, height: 50, borderRadius: 25, backgroundColor: colors.primary,
     justifyContent: 'center', alignItems: 'center',
   },
-  avatarText: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
+  avatarText: { color: colors.onPrimary, fontSize: 22, fontWeight: 'bold' },
   matchCardInfo: { flex: 1, marginLeft: 12 },
-  matchNickname: { fontSize: 17, fontWeight: 'bold', color: '#333' },
-  matchBio: { fontSize: 13, color: '#888', marginTop: 2 },
+  matchNickname: { fontSize: 17, fontWeight: 'bold', color: colors.text },
+  matchBio: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
   matchScoreRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  scoreBadge: { backgroundColor: '#F0EDFF', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  scoreText: { fontSize: 20, fontWeight: 'bold', color: '#6C5CE7' },
-  scoreLabel: { fontSize: 13, color: '#888', marginLeft: 8 },
-  matchButton: { backgroundColor: '#6C5CE7', borderRadius: 10, padding: 12, alignItems: 'center' },
-  matchButtonText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
+  scoreBadge: { backgroundColor: colors.surface, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  scoreText: { fontSize: 20, fontWeight: 'bold', color: colors.primaryLight },
+  scoreLabel: { fontSize: 13, color: colors.textMuted, marginLeft: 8 },
+  matchButton: { backgroundColor: colors.primary, borderRadius: 10, padding: 12, alignItems: 'center' },
+  matchButtonText: { color: colors.onPrimary, fontSize: 15, fontWeight: 'bold' },
 
   // 빈 매칭
   emptyMatch: { alignItems: 'center', marginTop: 20, marginBottom: 10 },
-  emptyText: { fontSize: 15, color: '#888' },
-  emptySubText: { fontSize: 13, color: '#AAA', marginTop: 4 },
+  emptyText: { fontSize: 15, color: colors.textMuted },
+  emptySubText: { fontSize: 13, color: colors.textMuted, marginTop: 4 },
 
   // 취향 이미지 카드
   tasteCard: {
     width: 130, height: 160, borderRadius: 14, marginHorizontal: 6, overflow: 'hidden',
   },
   tasteImage: { width: '100%', height: '100%' },
-  tastePlaceholder: { backgroundColor: colors.primary }, // 이미지 없는 태그
+  tastePlaceholder: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }, // 이미지 없는 태그
   tasteOverlay: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(0,0,0,0.45)', paddingVertical: 8, paddingHorizontal: 10,
+    backgroundColor: colors.overlay, paddingVertical: 8, paddingHorizontal: 10,
   },
-  tasteName: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
+  tasteName: { color: colors.onPrimary, fontSize: 14, fontWeight: 'bold' },
 
   // 라운지 카드
   loungeCard: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
+    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceSolid,
     borderRadius: 12, padding: 14, marginBottom: 8, marginHorizontal: 8,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
   },
-  loungeIcon: {
-    width: 44, height: 44, borderRadius: 12, backgroundColor: '#F0EDFF',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  loungeIconText: { fontSize: 22 },
   loungeInfo: { marginLeft: 12, flex: 1 },
-  loungeName: { fontSize: 16, fontWeight: 'bold', color: '#333' },
-  loungeMeta: { fontSize: 13, color: '#888', marginTop: 2 },
+  loungeName: { fontSize: 16, fontWeight: 'bold', color: colors.text },
+  loungeMeta: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
 
   // 모달
   modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
+    flex: 1, backgroundColor: colors.overlay,
     justifyContent: 'center', alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: '#fff', borderRadius: 20, padding: 24,
+    backgroundColor: colors.surfaceSolid, borderRadius: 20, padding: 24,
     width: '88%', alignItems: 'center',
     shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 20, elevation: 10,
   },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 4 },
-  modalScore: { fontSize: 28, fontWeight: 'bold', color: '#6C5CE7', marginBottom: 12 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 4 },
+  modalScore: { fontSize: 28, fontWeight: 'bold', color: colors.primaryLight, marginBottom: 12 },
   modalMatchBtn: {
-    backgroundColor: '#6C5CE7', borderRadius: 10, padding: 14,
+    backgroundColor: colors.primary, borderRadius: 10, padding: 14,
     alignItems: 'center', width: '100%', marginTop: 12,
   },
   modalCloseBtn: { marginTop: 12, padding: 8 },
-  modalCloseText: { color: '#888', fontSize: 15 },
+  modalCloseText: { color: colors.textMuted, fontSize: 15 },
 });

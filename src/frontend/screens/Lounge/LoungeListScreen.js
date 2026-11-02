@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, FlatList, TextInput, StyleSheet } from 'react-native';
 import { api } from '../../services/api';
+import { colors } from '../../theme';
+import { CategoryBadge } from '../../components/Space';
 
 export default function LoungeListScreen({ navigation }) {
   const [lounges, setLounges] = useState([]);
@@ -27,7 +29,7 @@ export default function LoungeListScreen({ navigation }) {
       onPress={() => navigation.navigate('LoungeChat', { loungeId: item.id })}
     >
       <View style={styles.cardHeader}>
-        <Text style={styles.icon}>{item.category_icon}</Text>
+        <CategoryBadge categoryId={item.category_id} />
         <View style={styles.cardInfo}>
           <Text style={styles.loungeName}>{item.name}</Text>
           <Text style={styles.loungeCategory}>{item.category_name}</Text>
@@ -61,21 +63,20 @@ export default function LoungeListScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
-  searchInput: {
-    margin: 16, backgroundColor: '#fff', borderRadius: 12, padding: 14, fontSize: 15,
-    borderWidth: 1, borderColor: '#E0E0E0',
+  container: { flex: 1, backgroundColor: colors.background },
+  searchInput: { color: colors.text,
+    margin: 16, backgroundColor: colors.surfaceSolid, borderRadius: 12, padding: 14, fontSize: 15,
+    borderWidth: 1, borderColor: colors.border,
   },
   card: {
-    backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 10, borderRadius: 14, padding: 16,
+    backgroundColor: colors.surfaceSolid, marginHorizontal: 16, marginBottom: 10, borderRadius: 14, padding: 16,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  icon: { fontSize: 28 },
   cardInfo: { flex: 1, marginLeft: 10 },
-  loungeName: { fontSize: 17, fontWeight: 'bold', color: '#333' },
-  loungeCategory: { fontSize: 13, color: '#888' },
-  memberCount: { fontSize: 14, color: '#6C5CE7', fontWeight: 'bold' },
-  description: { fontSize: 14, color: '#666', lineHeight: 20 },
-  empty: { textAlign: 'center', marginTop: 60, color: '#888', fontSize: 15 },
+  loungeName: { fontSize: 17, fontWeight: 'bold', color: colors.text },
+  loungeCategory: { fontSize: 13, color: colors.textMuted },
+  memberCount: { fontSize: 14, color: colors.primaryLight, fontWeight: 'bold' },
+  description: { fontSize: 14, color: colors.textMuted, lineHeight: 20 },
+  empty: { textAlign: 'center', marginTop: 60, color: colors.textMuted, fontSize: 15 },
 });

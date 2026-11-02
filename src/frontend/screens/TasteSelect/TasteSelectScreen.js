@@ -4,6 +4,8 @@ import {
   StyleSheet, Alert, Animated, Dimensions,
 } from 'react-native';
 import { api } from '../../services/api';
+import { colors } from '../../theme';
+import { CategoryBadge, Icon } from '../../components/Space';
 
 const { width } = Dimensions.get('window');
 const CARD_SIZE = (width - 48 - 12) / 3; // 3열 그리드
@@ -39,7 +41,7 @@ function TasteOptionCard({ option, isSelected, onPress }) {
         {/* 선택 오버레이 */}
         <Animated.View style={[styles.selectedOverlay, { opacity: opacityAnim }]}>
           <View style={styles.checkCircle}>
-            <Text style={styles.checkMark}>✓</Text>
+            <Icon name="check" size={18} color={colors.onPrimary} strokeWidth={3} />
           </View>
         </Animated.View>
 
@@ -92,7 +94,10 @@ export default function TasteSelectScreen({ navigation }) {
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         {categories.map(cat => (
           <View key={cat.id} style={styles.category}>
-            <Text style={styles.categoryName}>{cat.icon} {cat.name}</Text>
+            <View style={styles.categoryHead}>
+              <CategoryBadge code={cat.code} size={28} />
+              <Text style={[styles.categoryName, styles.categoryNameInline]}>{cat.name}</Text>
+            </View>
             <View style={styles.grid}>
               {cat.options.map(opt => (
                 <TasteOptionCard
@@ -116,21 +121,23 @@ export default function TasteSelectScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
-  title: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginTop: 20, color: '#333' },
-  subtitle: { fontSize: 14, color: '#888', textAlign: 'center', marginBottom: 10 },
+  container: { flex: 1, backgroundColor: colors.background },
+  title: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginTop: 20, color: colors.text },
+  subtitle: { fontSize: 14, color: colors.textMuted, textAlign: 'center', marginBottom: 10 },
   scroll: { flex: 1, paddingHorizontal: 16 },
   category: { marginBottom: 24 },
-  categoryName: { fontSize: 18, fontWeight: 'bold', marginBottom: 12, color: '#333' },
+  categoryHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  categoryNameInline: { marginBottom: 0, marginLeft: 8 },
+  categoryName: { fontSize: 18, fontWeight: 'bold', marginBottom: 12, color: colors.text },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
 
   // 이미지 카드
   card: {
     width: CARD_SIZE, height: CARD_SIZE * 1.2, borderRadius: 14, overflow: 'hidden',
-    backgroundColor: '#E0E0E0', marginBottom: 6,
+    backgroundColor: colors.surface, marginBottom: 6,
   },
   cardImage: { width: '100%', height: '100%' },
-  cardPlaceholder: { backgroundColor: '#D0D0D0' },
+  cardPlaceholder: { backgroundColor: colors.surface },
 
   // 선택 오버레이
   selectedOverlay: {
@@ -140,23 +147,22 @@ const styles = StyleSheet.create({
   },
   checkCircle: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#6C5CE7', justifyContent: 'center', alignItems: 'center',
+    backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center',
   },
-  checkMark: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
 
   // 이름 라벨
   cardLabel: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)', paddingVertical: 6, paddingHorizontal: 8,
+    backgroundColor: colors.overlay, paddingVertical: 6, paddingHorizontal: 8,
   },
   cardLabelSelected: { backgroundColor: 'rgba(108, 92, 231, 0.85)' },
-  cardLabelText: { color: '#fff', fontSize: 12, fontWeight: '600', textAlign: 'center' },
+  cardLabelText: { color: colors.onPrimary, fontSize: 12, fontWeight: '600', textAlign: 'center' },
   cardLabelTextSelected: { fontWeight: 'bold' },
 
   // 저장 버튼
   button: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: '#6C5CE7', margin: 16, borderRadius: 12, padding: 16, alignItems: 'center',
+    backgroundColor: colors.primary, margin: 16, borderRadius: 12, padding: 16, alignItems: 'center',
   },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  buttonText: { color: colors.onPrimary, fontSize: 16, fontWeight: 'bold' },
 });

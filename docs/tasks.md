@@ -171,11 +171,12 @@
 - [ ] `OrbitVisualization`: 중앙 내 캐릭터, 주변 취향 행성(카테고리별), 바깥 궤도 점(비슷한 사람, 온라인은 빛남), 행성 터치 → 해당 카테고리 라운지
 - [ ] Header (인사말, 닉네임, Guest 타이머 자리)
 - [ ] My Taste / Today's Question 카드 / Active Lounges / Quick Action
-- [ ] `theme/` 컬러·폰트 토큰 정의 + `docs/design.md` 작성
+- [x] `theme/` 컬러 토큰 정의 + `docs/design.md` 작성 (우주 테마 작업에서 선반영)
+- [ ] Home 레이아웃을 design.md 기준으로 다시 만들기 (지금은 색만 토큰 교체)
 
 ## #9 [FEAT] 하단 탭 네비게이션
 - [ ] RootNavigator (Welcome/Auth/Guest 스택 ↔ MainTabs)
-- [ ] MainTabs: Home / Lounge / Chat / My Orbit (아이콘, 활성 색)
+- [x] MainTabs: Home / Lounge / Chat / My Orbit (아이콘, 활성 색) — 우주 테마 작업에서 선반영 (SVG 아이콘, 떠 있는 탭바)
 - [ ] 각 탭 placeholder 화면 연결
 
 ## #10 [FEAT] Socket.io 실시간 채팅 기반

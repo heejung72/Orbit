@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -7,6 +8,12 @@ import RootNavigator from './navigation/RootNavigator';
 import { secureStorage, clearSession } from './services/storage';
 import { api, setOnSessionExpired } from './services/api';
 import { colors, spacing, typography } from './theme';
+
+// 화면·헤더·탭 기본 배경을 우주색으로
+const navTheme = {
+  ...DarkTheme,
+  colors: { ...DarkTheme.colors, primary: colors.primaryLight, background: colors.background, card: colors.background, text: colors.text, border: colors.border },
+};
 
 export default function App() {
   // authState: 'loading' | 'offline' | 'loggedOut' | 'guest' | 'member'
@@ -71,7 +78,8 @@ export default function App() {
   const isLoggedIn = authState === 'member' || authState === 'guest';
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navTheme}>
+      <StatusBar style="light" />
       <RootNavigator
         isLoggedIn={isLoggedIn}
         isGuest={isGuest}

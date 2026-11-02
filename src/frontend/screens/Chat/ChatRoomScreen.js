@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../../services/api';
+import { colors } from '../../theme';
 import { joinRoom, leaveRoom, sendMessage, onNewMessage, offNewMessage } from '../../services/socket';
 
 export default function ChatRoomScreen({ route, navigation }) {
@@ -110,41 +111,41 @@ export default function ChatRoomScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F0EDFF' },
+  container: { flex: 1, backgroundColor: colors.surface },
   messageList: { padding: 16, paddingBottom: 8 },
 
   // 메시지
   msgRow: { marginBottom: 8, alignItems: 'flex-start' },
   msgRowMine: { alignItems: 'flex-end' },
   senderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 2, marginLeft: 4 },
-  senderName: { fontSize: 12, color: '#888' },
+  senderName: { fontSize: 12, color: colors.textMuted },
   guestBadge: {
-    backgroundColor: '#FFE0B2', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1,
+    backgroundColor: colors.surface, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1,
     marginLeft: 6,
   },
-  guestBadgeText: { fontSize: 10, color: '#E65100', fontWeight: 'bold' },
+  guestBadgeText: { fontSize: 10, color: colors.warning, fontWeight: 'bold' },
   bubble: { maxWidth: '75%', borderRadius: 16, padding: 12 },
-  bubbleMine: { backgroundColor: '#6C5CE7', borderBottomRightRadius: 4 },
-  bubbleOther: { backgroundColor: '#fff', borderBottomLeftRadius: 4 },
-  msgText: { fontSize: 15, color: '#333' },
-  msgTextMine: { color: '#fff' },
+  bubbleMine: { backgroundColor: colors.primary, borderBottomRightRadius: 4 },
+  bubbleOther: { backgroundColor: colors.surfaceSolid, borderBottomLeftRadius: 4 },
+  msgText: { fontSize: 15, color: colors.text },
+  msgTextMine: { color: colors.onPrimary },
 
   // 가입 유도 배너
   signupBanner: {
-    backgroundColor: '#E8EAF6', paddingHorizontal: 16, paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: '#C5CAE9',
+    backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   signupBannerContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  signupBannerText: { fontSize: 13, color: '#3949AB', fontWeight: '600', flex: 1 },
+  signupBannerText: { fontSize: 13, color: colors.primaryLight, fontWeight: '600', flex: 1 },
   signupBannerBtn: { marginLeft: 12 },
-  signupBannerBtnText: { fontSize: 13, color: '#7986CB' },
+  signupBannerBtnText: { fontSize: 13, color: colors.primaryLight },
 
   // 입력 바
   inputBar: {
-    flexDirection: 'row', padding: 12, backgroundColor: '#fff',
-    borderTopWidth: 1, borderTopColor: '#EEE', alignItems: 'center',
+    flexDirection: 'row', padding: 12, backgroundColor: colors.surfaceSolid,
+    borderTopWidth: 1, borderTopColor: colors.border, alignItems: 'center',
   },
-  input: { flex: 1, backgroundColor: '#F5F5F5', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15 },
-  sendButton: { backgroundColor: '#6C5CE7', borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10, marginLeft: 8 },
-  sendText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  input: { color: colors.text, flex: 1, backgroundColor: colors.surface, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15 },
+  sendButton: { backgroundColor: colors.primary, borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10, marginLeft: 8 },
+  sendText: { color: colors.onPrimary, fontWeight: 'bold', fontSize: 15 },
 });

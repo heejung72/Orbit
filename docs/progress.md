@@ -59,6 +59,7 @@
 | 2026-10-31 | **PR 올리기 전 ponytail-review 셀프 리뷰 필수** | CodeRabbit 왕복 줄이기 (PR #20에서 3라운드) |
 | 2026-10-31 | CodeRabbit 리뷰 반영 커밋은 항상 **`[FIX]`** | 이슈 타입과 무관 |
 | 2026-10-31 | 이슈·커밋·PR 제목은 **`[TYPE]` 대문자 대괄호** 형식 | 예: `[FEAT] #5 Guest 세션 발급 API 추가`. 브랜치만 소문자 |
+| 2026-10-31 | UI 컨셉 = **검은 우주 + 보라 네온 궤도** (`reference/main.png`), 이모지 대신 이미지·SVG 아이콘 | [design.md](./design.md). 새 의존성 없이 react-native-svg + Animated |
 
 ## ❓ 미결정 사항
 | 항목 | 결정 예정 이슈 |

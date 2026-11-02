@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import { clearSession } from '../../services/storage';
 import { api } from '../../services/api';
+import { colors } from '../../theme';
+import Avatar from '../../components/Avatar';
 import { disconnectSocket } from '../../services/socket';
 import RadarChart from '../../_legacy/components/RadarChart';
 
@@ -46,9 +48,7 @@ export default function MyOrbitScreen({ navigation, onLogout }) {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{profile.nickname[0]}</Text>
-        </View>
+        <Avatar id={profile.avatar_id} size={88} style={styles.avatar} />
         {editing ? (
           <>
             <TextInput style={styles.input} value={nickname} onChangeText={setNickname} placeholder="닉네임" />
@@ -112,29 +112,28 @@ export default function MyOrbitScreen({ navigation, onLogout }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
-  loading: { textAlign: 'center', marginTop: 40, color: '#888' },
-  header: { backgroundColor: '#fff', padding: 24, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#EEE' },
-  avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#6C5CE7', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  avatarText: { color: '#fff', fontSize: 36, fontWeight: 'bold' },
-  nickname: { fontSize: 22, fontWeight: 'bold', color: '#333' },
-  bio: { fontSize: 15, color: '#888', marginTop: 4, textAlign: 'center' },
-  input: { backgroundColor: '#F5F5F5', borderRadius: 10, padding: 12, fontSize: 15, width: '100%', marginTop: 8 },
-  bioInput: { height: 60, textAlignVertical: 'top' },
-  editButton: { marginTop: 12, backgroundColor: '#E8E5FF', borderRadius: 10, paddingHorizontal: 20, paddingVertical: 8 },
-  editText: { color: '#6C5CE7', fontWeight: 'bold' },
-  saveButton: { marginTop: 12, backgroundColor: '#6C5CE7', borderRadius: 10, paddingHorizontal: 24, paddingVertical: 10 },
-  saveText: { color: '#fff', fontWeight: 'bold' },
-  section: { backgroundColor: '#fff', marginTop: 12, padding: 20 },
+  container: { flex: 1, backgroundColor: colors.background },
+  loading: { textAlign: 'center', marginTop: 40, color: colors.textMuted },
+  header: { backgroundColor: colors.surfaceSolid, padding: 24, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border },
+  avatar: { marginBottom: 12 },
+  nickname: { fontSize: 22, fontWeight: 'bold', color: colors.text },
+  bio: { fontSize: 15, color: colors.textMuted, marginTop: 4, textAlign: 'center' },
+  input: { color: colors.text, backgroundColor: colors.surface, borderRadius: 10, padding: 12, fontSize: 15, width: '100%', marginTop: 8 },
+  bioInput: { color: colors.text, height: 60, textAlignVertical: 'top' },
+  editButton: { marginTop: 12, backgroundColor: colors.surface, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 8 },
+  editText: { color: colors.primaryLight, fontWeight: 'bold' },
+  saveButton: { marginTop: 12, backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 24, paddingVertical: 10 },
+  saveText: { color: colors.onPrimary, fontWeight: 'bold' },
+  section: { backgroundColor: colors.surfaceSolid, marginTop: 12, padding: 20 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-  editLink: { color: '#6C5CE7', fontWeight: 'bold' },
-  emptyTaste: { color: '#888', fontSize: 14 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text },
+  editLink: { color: colors.primaryLight, fontWeight: 'bold' },
+  emptyTaste: { color: colors.textMuted, fontSize: 14 },
   tasteGroup: { marginBottom: 12 },
-  tasteCategoryName: { fontSize: 14, fontWeight: 'bold', color: '#555', marginBottom: 6 },
+  tasteCategoryName: { fontSize: 14, fontWeight: 'bold', color: colors.textMuted, marginBottom: 6 },
   tasteChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  tasteChip: { backgroundColor: '#F0EDFF', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 },
-  tasteChipText: { color: '#6C5CE7', fontSize: 13 },
-  logoutButton: { margin: 20, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#E74C3C', alignItems: 'center' },
-  logoutText: { color: '#E74C3C', fontWeight: 'bold', fontSize: 15 },
+  tasteChip: { backgroundColor: colors.surface, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 },
+  tasteChipText: { color: colors.primaryLight, fontSize: 13 },
+  logoutButton: { margin: 20, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.danger, alignItems: 'center' },
+  logoutText: { color: colors.danger, fontWeight: 'bold', fontSize: 15 },
 });

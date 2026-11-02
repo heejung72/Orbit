@@ -27,18 +27,23 @@ export default function RootNavigator({ isLoggedIn, isGuest, needsTaste, onLogin
 
   return (
     <Stack.Navigator
-      screenOptions={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: colors.onPrimary }}
+      screenOptions={{
+        headerStyle: { backgroundColor: colors.background },
+        headerTintColor: colors.text,
+        headerShadowVisible: false,
+        headerBackTitleVisible: false,
+      }}
     >
       {!isLoggedIn ? (
         <>
           <Stack.Screen name="Welcome" component={WelcomeScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Login" options={{ title: '로그인' }}>
+          <Stack.Screen name="Login" options={{ title: '' }}>
             {props => <LoginScreen {...props} onLogin={onLogin} />}
           </Stack.Screen>
           <Stack.Screen name="GuestEntry" options={{ headerShown: false }}>
             {props => <GuestEntryScreen {...props} onStart={onGuestLogin} />}
           </Stack.Screen>
-          <Stack.Screen name="Register" options={{ title: '회원가입' }}>
+          <Stack.Screen name="Register" options={{ title: '' }}>
             {props => <RegisterScreen {...props} onLogin={onLogin} />}
           </Stack.Screen>
         </>

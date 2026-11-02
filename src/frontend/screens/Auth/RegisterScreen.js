@@ -1,11 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, Pressable, Animated, StyleSheet, Alert, ScrollView } from 'react-native';
 import { api } from '../../services/api';
 import { saveMemberSession } from '../../services/storage';
-import { colors, spacing, radius, typography } from '../../theme';
+import Avatar from '../../components/Avatar';
+import { SpaceScreen, SpaceButton, SpaceInput, FadeUp } from '../../components/Space';
+import { colors, spacing, typography, glow, nativeDriver } from '../../theme';
 
 // 서버(routes/auth.js)와 같은 가입 규칙
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// 고르면 커지면서 빛나는 캐릭터
+function AvatarOption({ avatar, selected, onPress }) {
+  const scale = useRef(new Animated.Value(selected ? 1.15 : 1)).current;
+  useEffect(() => {
+    Animated.spring(scale, { toValue: selected ? 1.15 : 1, bounciness: 12, useNativeDriver: nativeDriver }).start();
+  }, [selected, scale]);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${avatar.name} 캐릭터`}
+      accessibilityState={{ selected }}
+    >
+      <Animated.View style={[styles.avatar, selected && styles.avatarSelected, { transform: [{ scale }] }]}>
+        <Avatar id={avatar.id} size={44} />
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 export default function RegisterScreen({ onLogin }) {
   const [email, setEmail] = useState('');
@@ -43,55 +66,42 @@ export default function RegisterScreen({ onLogin }) {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <Text style={styles.title}>회원가입</Text>
+    <SpaceScreen>
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <FadeUp>
+          <Text style={styles.title}>나의 궤도 만들기</Text>
 
-      {avatars.length > 0 && (
-        <>
-          <Text style={styles.label}>나의 캐릭터</Text>
-          <View style={styles.avatarRow}>
-            {avatars.map((a) => (
-              <TouchableOpacity
-                key={a.id}
-                onPress={() => setAvatarId(a.id)}
-                style={[styles.avatar, avatarId === a.id && { borderColor: a.color, backgroundColor: colors.surface }]}
-                accessibilityRole="button"
-                accessibilityLabel={`${a.name} 캐릭터`}
-                accessibilityState={{ selected: avatarId === a.id }}
-              >
-                <Text style={styles.avatarEmoji}>{a.emoji}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </>
-      )}
+          {avatars.length > 0 && (
+            <>
+              <Text style={styles.label}>나의 캐릭터</Text>
+              <View style={styles.avatarRow}>
+                {avatars.map((a) => (
+                  <AvatarOption key={a.id} avatar={a} selected={avatarId === a.id} onPress={() => setAvatarId(a.id)} />
+                ))}
+              </View>
+            </>
+          )}
 
-      <TextInput style={styles.input} placeholder="닉네임 (2~12자)" value={nickname} onChangeText={setNickname} maxLength={12} />
-      <TextInput style={styles.input} placeholder="이메일" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-      <TextInput style={styles.input} placeholder="비밀번호 (8자 이상)" value={password} onChangeText={setPassword} secureTextEntry />
+          <SpaceInput placeholder="닉네임 (2~12자)" value={nickname} onChangeText={setNickname} maxLength={12} />
+          <SpaceInput placeholder="이메일" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+          <SpaceInput placeholder="비밀번호 (8자 이상)" value={password} onChangeText={setPassword} secureTextEntry />
 
-      <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading} accessibilityRole="button">
-        <Text style={styles.buttonText}>{loading ? '가입 중...' : '가입하고 시작하기'}</Text>
-      </TouchableOpacity>
-    </ScrollView>
+          <SpaceButton title={loading ? '가입 중...' : '가입하고 시작하기'} onPress={handleRegister} disabled={loading} style={styles.button} />
+        </FadeUp>
+      </ScrollView>
+    </SpaceScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: spacing.xl, backgroundColor: colors.background, justifyContent: 'center' },
-  title: { ...typography.title, fontSize: 28, color: colors.text, marginBottom: spacing.lg, textAlign: 'center' },
+  container: { flexGrow: 1, padding: spacing.xl, justifyContent: 'center' },
+  title: { ...typography.title, fontSize: 28, color: colors.text, marginBottom: spacing.lg },
   label: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm },
-  avatarRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: spacing.md },
+  avatarRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: spacing.lg },
   avatar: {
     width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center',
-    marginRight: spacing.sm, marginBottom: spacing.sm, borderWidth: 2, borderColor: 'transparent',
-    backgroundColor: colors.border,
+    borderWidth: 1.5, borderColor: 'transparent', backgroundColor: colors.surface,
   },
-  avatarEmoji: { fontSize: 26 },
-  input: {
-    backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, fontSize: 16,
-    marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border,
-  },
-  button: { backgroundColor: colors.primary, borderRadius: radius.md, padding: spacing.md, alignItems: 'center', marginTop: spacing.sm },
-  buttonText: { color: colors.onPrimary, fontSize: 18, fontWeight: 'bold' },
+  avatarSelected: { borderColor: colors.primaryLight, ...glow(colors.primary, 12) },
+  button: { marginTop: spacing.sm },
 });

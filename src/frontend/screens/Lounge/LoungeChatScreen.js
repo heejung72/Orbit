@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, FlatList, StyleSheet, Alert } from 'react-native';
 import { api } from '../../services/api';
+import { colors } from '../../theme';
 
 export default function LoungeChatScreen({ route, navigation }) {
   const { loungeId } = route.params;
@@ -64,23 +65,23 @@ export default function LoungeChatScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
-  loading: { textAlign: 'center', marginTop: 40, color: '#888' },
-  header: { backgroundColor: '#fff', padding: 20, borderBottomWidth: 1, borderBottomColor: '#EEE' },
-  name: { fontSize: 24, fontWeight: 'bold', color: '#333' },
-  category: { fontSize: 14, color: '#6C5CE7', marginTop: 4 },
-  description: { fontSize: 15, color: '#666', marginTop: 10, lineHeight: 22 },
-  owner: { fontSize: 13, color: '#888', marginTop: 8 },
+  container: { flex: 1, backgroundColor: colors.background },
+  loading: { textAlign: 'center', marginTop: 40, color: colors.textMuted },
+  header: { backgroundColor: colors.surfaceSolid, padding: 20, borderBottomWidth: 1, borderBottomColor: colors.border },
+  name: { fontSize: 24, fontWeight: 'bold', color: colors.text },
+  category: { fontSize: 14, color: colors.primaryLight, marginTop: 4 },
+  description: { fontSize: 15, color: colors.textMuted, marginTop: 10, lineHeight: 22 },
+  owner: { fontSize: 13, color: colors.textMuted, marginTop: 8 },
   actions: { flexDirection: 'row', padding: 16, gap: 10 },
-  joinButton: { flex: 1, backgroundColor: '#6C5CE7', borderRadius: 12, padding: 14, alignItems: 'center' },
-  joinText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-  chatButton: { flex: 1, backgroundColor: '#E8E5FF', borderRadius: 12, padding: 14, alignItems: 'center' },
+  joinButton: { flex: 1, backgroundColor: colors.primary, borderRadius: 12, padding: 14, alignItems: 'center' },
+  joinText: { color: colors.onPrimary, fontWeight: 'bold', fontSize: 15 },
+  chatButton: { flex: 1, backgroundColor: colors.surface, borderRadius: 12, padding: 14, alignItems: 'center' },
   chatButtonDisabled: { opacity: 0.5 },
-  chatText: { color: '#6C5CE7', fontWeight: 'bold', fontSize: 15 },
-  sectionTitle: { fontSize: 17, fontWeight: 'bold', marginLeft: 16, marginTop: 8, marginBottom: 8, color: '#333' },
-  member: { flexDirection: 'row', alignItems: 'center', padding: 12, paddingHorizontal: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F5F5F5' },
-  memberAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#6C5CE7', justifyContent: 'center', alignItems: 'center' },
-  memberAvatarText: { color: '#fff', fontWeight: 'bold' },
-  memberName: { fontSize: 15, marginLeft: 10, flex: 1, color: '#333' },
-  badge: { backgroundColor: '#FFD93D', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, fontSize: 12, fontWeight: 'bold' },
+  chatText: { color: colors.primaryLight, fontWeight: 'bold', fontSize: 15 },
+  sectionTitle: { fontSize: 17, fontWeight: 'bold', marginLeft: 16, marginTop: 8, marginBottom: 8, color: colors.text },
+  member: { flexDirection: 'row', alignItems: 'center', padding: 12, paddingHorizontal: 16, backgroundColor: colors.surfaceSolid, borderBottomWidth: 1, borderBottomColor: colors.border },
+  memberAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
+  memberAvatarText: { color: colors.onPrimary, fontWeight: 'bold' },
+  memberName: { fontSize: 15, marginLeft: 10, flex: 1, color: colors.text },
+  badge: { backgroundColor: colors.warning, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, fontSize: 12, fontWeight: 'bold' },
 });
