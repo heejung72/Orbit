@@ -66,15 +66,22 @@
 ## Lounges — #11
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
-| GET | `/lounges?category=` | O | 라운지 목록 + 현재 인원 |
-| GET | `/lounges/recommended` | O | 내 취향 기반 추천 |
-| GET | `/lounges/:id` | O | 라운지 상세 |
-| GET | `/lounges/:id/messages?before=` | O | 최근 메시지 (PG + Redis 병합) |
+| GET | `/lounges?category_id=&search=` | O | 라운지 목록, 인원순. `member_count`(회원 + 만료 전 Guest), `is_member` |
+| GET | `/lounges/recommended` | O | 내 취향 기반 추천 최대 5개 (`score` 포함). 취향 0개면 `[]` |
+| GET | `/lounges/:id` | O | 상세: `chat_room_id`, `tags`, `members`(회원 최근 50명, 닉네임·캐릭터), `guest_count`, `member_count`, `is_member` |
+| POST | `/lounges/:id/join` | O | 참여 (회원 PG / Guest Redis). 이미 참여 중이면 그대로 200, 정원 초과 400 `LOUNGE_FULL` |
+| DELETE | `/lounges/:id/leave` | O | 나가기 |
+
+- 추천 점수: 라운지 대표 태그와 겹치는 내 태그 중요도 × 2 + 같은 카테고리 내 취향 중요도 합. 동점은 인원순
+- 정원(`max_members`)은 Guest 포함, 라운지 행 잠금으로 동시 참여에도 넘지 않음
+- Redis가 끊기면 회원은 회원 수만으로 목록·상세·참여 가능, Guest 요청은 503
+- 메시지 기록은 `GET /chat/rooms/:chatRoomId/messages` (#10) — 라운지 전용 메시지 API는 두지 않음
+- 실시간 접속 인원은 소켓 `room:presence`
 
 ## Chat — #10
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
-| GET | `/chat/rooms` | O | `{ direct: [...], lounges: [...] }` — 회원의 1:1·참여 라운지 방. Guest는 빈 목록(1:1 #13, 라운지 참여 #11) |
+| GET | `/chat/rooms` | O | `{ direct: [...], lounges: [...] }` — 1:1 방(회원)과 참여한 라운지 방(회원 PG·Guest Redis). Guest의 1:1은 #13 |
 | GET | `/chat/rooms/:id/messages?before=&limit=` | O | 회원(PG) + Guest(Redis) 메시지를 시간순 병합, 최대 100개. 형식은 소켓 `message:new`와 같음. 만료된 Guest의 메시지는 제외 |
 | POST | `/chat/rooms/:id/leave` | O | 1:1 방 나가기 (둘 다 나가면 `closed_at`). 라운지는 400 → 라운지 나가기는 #11 |
 | GET | `/chat/rooms/:id/topics` | O | 공통 취향 기반 대화 주제 추천 (#13) |
