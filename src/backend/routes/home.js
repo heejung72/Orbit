@@ -33,6 +33,7 @@ router.get('/', async (req, res) => {
     res.json({ me, tastes, question, lounges });
   } catch (err) {
     if (err.code === 'REDIS_UNAVAILABLE') return res.status(503).json({ error: '잠시 후 다시 시도해주세요', code: 'UNAVAILABLE' });
+    console.error('GET /api/home 실패:', err); // 응답은 일반 문구, 원인은 서버 로그에만 (Guest 메시지 본문은 이 경로에 없음)
     res.status(500).json({ error: '서버 오류가 발생했습니다' });
   }
 });

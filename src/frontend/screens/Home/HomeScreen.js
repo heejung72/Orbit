@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, RefreshControl, ActivityIndicator, StyleSheet, useWindowDimensions } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { api } from '../../services/api';
@@ -51,12 +51,16 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
+  // 포커스 갱신과 당겨서 새로고침이 겹칠 수 있어, 가장 마지막 요청의 결과만 반영한다
+  const latestLoad = useRef(0);
   const load = useCallback(async () => {
+    const id = ++latestLoad.current;
     setError('');
     try {
-      setHome(await api.getHome());
+      const data = await api.getHome();
+      if (id === latestLoad.current) setHome(data);
     } catch (err) {
-      setError(err instanceof TypeError ? '서버에 연결할 수 없어요' : err.message);
+      if (id === latestLoad.current) setError(err instanceof TypeError ? '서버에 연결할 수 없어요' : err.message);
     }
   }, []);
 
@@ -114,7 +118,15 @@ export default function HomeScreen() {
         </View>
         <Avatar emoji={me.avatar_emoji} size={48} />
       </View>
-      {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
+      {/* 이미 보던 Home이 있을 때 갱신 실패: 기존 화면은 두고 안내 + 다시 시도 */}
+      {error ? (
+        <View style={styles.errorRow}>
+          <Text style={styles.error} accessibilityRole="alert">{error}</Text>
+          <Pressable onPress={load} accessibilityRole="button" hitSlop={spacing.sm}>
+            <Text style={styles.link}>다시 시도</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {/* Your Orbit + Quick Action */}
       <Section title="Your Orbit">
@@ -186,7 +198,8 @@ const styles = StyleSheet.create({
   muted: { ...typography.caption, color: colors.textMuted },
   link: { ...typography.body, color: colors.primary },
   retry: { marginTop: spacing.md, padding: spacing.sm },
-  error: { ...typography.caption, color: colors.primary, marginBottom: spacing.sm },
+  errorRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginBottom: spacing.sm },
+  error: { ...typography.caption, color: colors.primary, flex: 1 },
 
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
   headerText: { flex: 1, marginRight: spacing.md },
