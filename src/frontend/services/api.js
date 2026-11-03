@@ -47,6 +47,7 @@ export const api = {
 
   // Guest (30분 둘러보기)
   createGuestSession: () => request('/guest/session', { method: 'POST' }),
+  endGuestSession: () => request('/guest/session', { method: 'DELETE' }),
 
   // 공개 API (비로그인)
   getPublicLounges: (params = {}) => {
@@ -60,7 +61,8 @@ export const api = {
 
   // 프로필
   getProfile: () => request('/users/me'),
-  updateProfile: (data) => request('/users/me', { method: 'PUT', body: JSON.stringify(data) }),
+  updateProfile: (data) => request('/users/me', { method: 'PATCH', body: JSON.stringify(data) }), // { nickname?, avatar_id? }
+  deleteAccount: (password) => request('/users/me', { method: 'DELETE', body: JSON.stringify({ password }) }),
 
   // 취향 (회원·Guest 공통)
   getCategories: () => request('/tastes/categories'),

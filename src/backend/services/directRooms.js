@@ -138,6 +138,16 @@ async function readDirectMessages(room, { before = null, limit = 50 } = {}) {
   return all.filter((m) => !before || m.created_at < before).slice(-limit);
 }
 
+// 회원 탈퇴 시 참여 중인 모든 Redis 1:1 방에서 나간다 (상대 Guest가 혼자 남은 방으로 보이게)
+async function leaveAllDirectRooms(key) {
+  const redis = getRedis();
+  for (const id of await redis.sMembers(actorRoomsKey(key))) {
+    const room = await getDirectRoom(id);
+    if (room) await leaveDirectRoom(room, key);
+  }
+  await redis.del(actorRoomsKey(key));
+}
+
 // Guest가 둘러보기를 직접 끝낼 때 그 Guest의 방을 바로 지운다 (시간 만료는 TTL)
 async function removeGuestRooms(guestId) {
   const redis = getRedis();
@@ -150,6 +160,7 @@ module.exports = {
   createDirectRoom,
   getDirectRoom,
   leaveDirectRoom,
+  leaveAllDirectRooms,
   listDirectRooms,
   activePartners,
   pushDirectMessage,

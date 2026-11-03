@@ -3,10 +3,10 @@
 > **작업을 다시 시작할 때 이 파일부터 읽는다.** 작업이 끝날 때마다 갱신한다.
 
 ## 🔖 지금 상태
-- **현재 이슈:** #13 [FEAT] 1:1 취향 매칭 — `feat/#13-matching`
-- **상태:** 구현·셀프 리뷰 완료 → PR 리뷰 (#17 My Orbit PR과 병행)
-- **다음 할 일:** #13·#17 머지 → #14 Guest → 회원 전환 → #15 → #16 (우주 테마 `style/#24-space-theme`는 기능 이슈 뒤로 보류)
-- **로컬 준비물:** PostgreSQL + Redis, `src/backend`에서 `npm install`(socket.io-client 추가됨), 테스트는 `npm run test:auth`, `test:guest`, `test:tastes`, `test:home`, `test:chat`, `test:lounges`, `test:guest-expiry`, `test:matching` (서버 실행 중, `GUEST_CLEANUP_INTERVAL_MS`를 줄이면 빨리 끝남)
+- **현재 이슈:** #17 [FEAT] My Orbit — `feat/#17-my-orbit`
+- **상태:** 구현·셀프 리뷰 완료 → PR 리뷰 (#13은 PR #30으로 머지)
+- **다음 할 일:** #17 머지 → #13 리뷰 후속 수정 PR → #14 Guest → 회원 전환 → #15 → #16 (우주 테마 `style/#24-space-theme`는 기능 이슈 뒤로 보류)
+- **로컬 준비물:** PostgreSQL + Redis, `src/backend`에서 `npm install`(socket.io-client 추가됨), 테스트는 `npm run test:auth`, `test:guest`, `test:tastes`, `test:home`, `test:chat`, `test:lounges`, `test:guest-expiry`, `test:matching`, `test:users` (서버 실행 중, `GUEST_CLEANUP_INTERVAL_MS`를 줄이면 빨리 끝남)
 
 ## ✅ 완료한 이슈
 | # | 제목 | PR | 머지일 |
@@ -22,6 +22,7 @@
 | 10 | [FEAT] Socket.io 실시간 채팅 기반 | #27 | 2026-11-03 |
 | 11 | [FEAT] 취향 라운지 | #28 | 2026-11-03 |
 | 12 | [FEAT] Guest Time Attack | #29 | 2026-11-03 |
+| 13 | [FEAT] 1:1 취향 매칭 | #30 | 2026-11-03 |
 
 ## 📌 결정 로그
 | 날짜 | 결정 | 근거/비고 |
@@ -87,6 +88,11 @@
 | 2026-11-03 | 라운지 Guest 메시지 정리는 LREM(값 단위 삭제) | 리스트를 다시 쓰면 그사이 들어온 메시지를 잃을 수 있음 |
 | 2026-11-03 | Guest 만료 감지 5경로(소켓·HTTP·만료 시각 타이머·앱 복귀·앱 재실행)를 `endSession('guest')` 하나로 | 어느 경로든 "궤도가 사라졌어요" 화면 |
 | 2026-11-03 | 테마에 `colors.danger` 추가 | 남은 시간 강조. 우주 테마(#24)에도 같은 이름 토큰 있음 |
+| 2026-11-03 | #17을 #12 머지 전에 #12 브랜치 위에서 시작 | GuestTimer·`endSession` 재사용. #12 머지(PR #29) 후 main 기준으로 PR |
+| 2026-11-03 | 프로필 수정은 **`PATCH /users/me`**(바뀐 필드만), `PUT` 삭제 | 부분 수정이 자연스러움 |
+| 2026-11-03 | 탈퇴는 **비밀번호 재확인**, PG 1:1 방 종료 + 계정 삭제를 한 트랜잭션으로, Guest와의 Redis 1:1 방은 커밋 후 나가기(실패해도 탈퇴는 성공, 방은 Guest 만료 시 사라지고 탈퇴 회원은 접근 불가), 메시지는 "떠난 궤도"로 남김 | 상대 대화 기록 보존, 오조작 방지 |
+| 2026-11-03 | Guest에게도 My Orbit 탭 표시 (남은 시간·취향 편집·둘러보기 끝내기) | #9 닫으면서 #17로 넘김. 가입 버튼은 #14 |
+| 2026-11-03 | `_legacy/components`(RadarChart·VennDiagram) 삭제 | #8·#17 재작성으로 쓰는 곳 없음 |
 | 2026-11-03 | 매칭 API를 Guest에게도 열기 (`/api/matching` optionalAuth) | #13. PRD §3-2 Guest 1:1 허용 |
 | 2026-11-03 | 온라인 상태 = Redis `online:actors`(소켓 수), 후보는 접속 중인 사람만 | #13. 단일 서버 MVP, 서버 시작 시 비움 |
 | 2026-11-03 | 후보 응답은 실제 id 대신 `ref`(10분, 발급받은 사람만) | 익명성, 위조·재사용 방지 |
