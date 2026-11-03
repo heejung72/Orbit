@@ -20,8 +20,8 @@
 | 9 | [FEAT] 하단 탭 네비게이션 | - | - | 닫음 (탭 구조는 #2, 디자인은 #24, Guest My Orbit은 #17) |
 | 10 | [FEAT] Socket.io 실시간 채팅 기반 | `feat/#10-socket-chat` | 4, 5 | ✅ |
 | 11 | [FEAT] 취향 라운지 | `feat/#11-lounge` | 10 | ✅ |
-| 12 | [FEAT] Guest Time Attack | `feat/#12-guest-time-attack` | 5, 10 | 🟨 |
-| 13 | [FEAT] 1:1 취향 매칭 | `feat/#13-matching` | 7, 10 | ⬜ |
+| 12 | [FEAT] Guest Time Attack | `feat/#12-guest-time-attack` | 5, 10 | ✅ |
+| 13 | [FEAT] 1:1 취향 매칭 | `feat/#13-matching` | 7, 10 | 🟨 PR |
 | 14 | [FEAT] Guest → 회원 전환 | `feat/#14-guest-upgrade` | 12, 13 | ⬜ |
 | 15 | [FEAT] 오늘의 질문 | `feat/#15-today-question` | 8, 13 | ⬜ |
 | 16 | [FEAT] 신고·차단, 비속어 필터·스팸 Rate Limit | `feat/#16-safety` | 10 | ⬜ |
@@ -248,11 +248,17 @@
 - 하지 않은 것: 가입 유도 모달 → #14 / Guest 1:1 방 정리 → #13 / 분산 스케줄러 → V2
 
 ## #13 [FEAT] 1:1 취향 매칭
-- [ ] `services/matching` 가중치 코사인 유사도 + 제외 규칙 ([system_design.md §6](./system_design.md)) — 후보는 온라인 actor만
-- [ ] `GET /matching/candidates`, 요청/수락/거절 API + `match:request`/`match:accepted` 이벤트
-- [ ] Matching 화면 (상대 캐릭터, 닉네임, 공통 취향 3개, [대화 요청])
-- [ ] 수락 시 1:1 방 생성 (회원끼리는 PG, Guest가 끼면 Redis 임시방)
-- [ ] 대화 주제 추천 `GET /chat/rooms/:id/topics` + ChatRoom 상단 카드
+- [x] 소켓 연결·끊김 시 `online:actors` 갱신(같은 사람 여러 기기는 1명), actor 전용 방 `actor:{key}`
+- [x] `services/matching` 재작성: 온라인 후보, 제외 규칙(차단·대화 중·대기 중·24시간 거절), Guest 취향 포함, `ref` 발급 ([system_design.md §6](./system_design.md))
+- [x] `GET /matching/candidates`·`GET/POST /matching/requests`·`accept`·`reject` (회원 PG / Guest Redis) + `match:request`·`match:accepted`·`match:rejected`, 예전 API 삭제, `/api/matching` optionalAuth
+- [x] 수락 시 1:1 방 (회원끼리 PG, Guest가 끼면 Redis `room:{id}`) — 동시 요청·중복 수락에도 하나만
+- [x] Redis 1:1 방: 접근 확인·메시지 저장·기록·목록·나가기 (`services/directRooms.js`), Guest 만료·둘러보기 종료 시 방·요청 정리
+- [x] `GET /chat/rooms/:id/topics` (`services/topics.js`)
+- [x] `tests/matching.e2e.js` 15개 (`npm run test:matching`)
+- [x] Matching 화면 (받은 요청 수락·거절, 후보 카드: 캐릭터·닉네임·Guest·유사도·공통 취향 3개·[대화 요청], 보낸 요청, 빈 후보 → 라운지), Home "사람 만나기" 연결
+- [x] 어느 화면에서든 대화 요청 알림 배너, 수락되면 양쪽 모두 채팅방으로 이동
+- [x] ChatRoom(1:1) 상단 대화 주제 카드(누르면 입력창에), 채팅 목록 1:1에 상대 캐릭터·Guest 표시
+- 하지 않은 것: 오프라인 회원 후보 → V2 / Guest 차단·신고, 매칭 Rate Limit → #16 / 가입 시 Redis 방 이전 → #14 / 카테고리 가중치 → 필요 시 / 푸시 알림 → V2 / 보낸 요청 취소 → 필요 시
 
 ## #14 [FEAT] Guest → 회원 전환
 - [ ] `SignupNudgeModal` (3가지 트리거: 기록 저장 버튼 / 만료 5분 전 / 메시지 20개)

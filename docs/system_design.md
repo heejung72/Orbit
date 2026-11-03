@@ -98,10 +98,18 @@ sequenceDiagram
 | `guest:session:{sha256(token)}` | Hash | guestId, nickname, avatarId, avatarEmoji, expiresAt (토큰 원본은 저장하지 않음) | expiresAt까지 (#5) |
 | `guest:id:{guestId}` | String | 세션 키 (역조회, 강제 종료용) | 동일 (#12에서 추가) |
 | `guest:tastes:{guestId}` | Hash | tagId → weight (저장 시 DEL+HSET+PEXPIREAT를 MULTI로, `DELETE /guest/session` 시 함께 삭제) | 동일 (#7) |
-| `guest:rooms:{guestId}` | Set | 참여 중인 1:1 roomId | 동일 (#13) |
+| `guest:profile:{guestId}` | Hash | nickname, avatarId, avatarEmoji, expiresAt — guestId로 표시 정보를 찾기 위한 복사본 (매칭 후보·1:1 방) | 동일 (#13) |
 | `guest:lounges:{guestId}` | Set | 참여한 loungeId | 동일 (#11) |
 | `lounge:{loungeId}:guests` | Sorted Set | guestId, score = 세션 expiresAt. 인원 계산 시 score > now만 셈, 참여 때 만료분 정리 | 마지막 참여 후 30분 (#11) |
 | `room:{roomId}:guestmsgs` | List | Guest 메시지 JSON(작성자 `guestId`·`expiresAt` 포함, 최근 500개). 읽을 때 만료된 작성자 메시지 제외 (#10) | 마지막 Guest 메시지 후 30분. 만료 작성자 메시지는 30초 정리 작업이 제거 (#12) |
+| `online:actors` | Hash | actorKey(`member:{id}`·`guest:{id}`) → 연결된 소켓 수. 연결 +1, 끊김 -1(0이면 삭제, Lua로 한 번에), 서버 시작 시 비움 | 없음 (#13) |
+| `room:{roomId}` | Hash | Guest가 낀 1:1 방: createdAt, expiresAt, members(JSON: actorKey·방 단위 닉네임·캐릭터·Guest 여부), `left:{actorKey}` | 참여 Guest 중 가장 이른 만료 시각 (#13) |
+| `room:{roomId}:msgs` | List | 위 방의 **모든** 메시지 JSON(회원 메시지 포함, 최근 500개) | 방과 같음 (#13) |
+| `actor:rooms:{actorKey}` | Set | 참여 중인 Redis 1:1 roomId. 회원 목록은 읽을 때 사라진 방 정리 | Guest는 본인 만료 시각, 회원은 없음 (#13) |
+| `match:ref:{ref}` | String | 후보 참조 JSON {owner, target, score, common}. 발급받은 사람만 사용, 요청하면 삭제 | 10분 (#13) |
+| `match:{matchId}` | Hash | Guest가 낀 매칭 요청: requester, target, status, similarity, commonTagIds, createdAt, roomId | 참여 Guest 중 가장 이른 만료 시각 (#13) |
+| `match:pair:{a}\|{b}` | String | 두 사람 사이 요청 하나(SET NX) — 대기·거절 상태 동안 다시 요청 불가 | 동일 (#13) |
+| `actor:matches:{actorKey}` | Set | 보낸·받은 Redis 요청 matchId (회원 목록은 읽을 때 정리) | Guest는 본인 만료 시각 (#13) |
 | `guest:answers:{guestId}` | Hash | questionId → 답변 | 동일 |
 | `guest:msgcount:{guestId}` | String | 보낸 메시지 수 (가입 유도 트리거) | 동일 |
 
@@ -119,7 +127,7 @@ sequenceDiagram
 | 상황 | 저장 위치 |
 |---|---|
 | Member ↔ Member 1:1 | PostgreSQL `messages` (방: `chat_rooms` + `chat_members`) |
-| Member/Guest ↔ Guest 1:1 | Redis `room:{id}:guestmsgs` — **방 자체도 Redis에만** 존재 (PG `chat_rooms` 행 없음) |
+| Member/Guest ↔ Guest 1:1 | Redis `room:{id}:msgs` — **방 자체도 Redis에만**(`room:{id}`), 회원 메시지도 Redis. 참여 Guest가 만료되면 방·메시지가 함께 사라짐 (#13) |
 | 라운지에서 Member가 보낸 메시지 | PostgreSQL `messages` |
 | 라운지에서 Guest가 보낸 메시지 | Redis (만료 시 삭제) |
 
@@ -130,9 +138,9 @@ sequenceDiagram
 2. 서버 트랜잭션:
    - users 생성
    - `guest:tastes` → `user_tastes` INSERT
-   - `guest:rooms`의 방(Redis 임시방) → 상대가 **회원**이면 `chat_rooms`(direct) + `chat_members` 2행을 PG에 새로 생성 / 상대가 **Guest**면 방은 Redis에 그대로 두고 본인만 회원으로 표시 (#14에서 확정)
+   - `actor:rooms:guest:{id}`의 방(Redis 1:1 방) → 상대가 **회원**이면 `chat_rooms`(direct) + `chat_members` 2행을 PG에 새로 생성 / 상대가 **Guest**면 방은 Redis에 그대로 두고 본인만 회원으로 표시 (#14에서 확정)
    - `guest:lounges`의 라운지 → `lounge_members` INSERT, `lounge:{id}:guests`에서 제거
-   - `room:{id}:guestmsgs`에서 **가입한 Guest 본인이 보낸 메시지만** → `messages` INSERT (sender = 새 userId)
+   - 라운지 `room:{id}:guestmsgs`·1:1 `room:{id}:msgs`에서 **가입한 Guest 본인이 보낸 메시지만** → `messages` INSERT (sender = 새 userId)
    - 같은 방의 **Member 메시지**는 원래 작성자(sender_id)를 그대로 유지한다 (이미 PG에 있으면 그대로, Redis에 있으면 원 작성자로 INSERT)
    - **다른 Guest(가입하지 않은 상대)의 메시지는 PostgreSQL로 이전하지 않는다** — Guest 메시지 보관 정책 유지. 해당 Guest 만료 시 Redis에서 삭제
    - `guest:answers` → `question_answers` INSERT
@@ -145,6 +153,7 @@ sequenceDiagram
 
 - **연결 인증**: `auth.token`(회원 JWT) 또는 `auth.guestToken`(Guest). 거절 시 `connect_error`의 `data.code` = `UNAUTHORIZED` / `GUEST_EXPIRED` / `UNAVAILABLE`
 - **Guest는 모든 이벤트 처리 전** 세션을 다시 확인하고, 만료(시간·직접 종료)면 `guest:expired`를 보낸 뒤 연결을 끊는다 (#10). 이벤트가 없어도 **소켓별 만료 타이머**가 `expiresAt`에 같은 처리를 한다 (#11, PR #28). 5분 전 알림·30초 정리 작업은 #12
+- **연결 시** actor 전용 방 `actor:{actorKey}`에 들어가고(매칭 이벤트 전달용), `online:actors`에 기록 (#13)
 - **결과·오류는 ack 콜백** `{ ok: true, ... }` / `{ ok: false, code, message }` (`ROOM_NOT_FOUND`, `ROOM_CLOSED`, `INVALID_MESSAGE`, `UNAVAILABLE`, `SERVER_ERROR`)
 
 | 방향 | 이벤트 | payload | 설명 |
@@ -157,21 +166,30 @@ sequenceDiagram
 | S→C | `typing` | `{roomId}` | 상대 입력 중 |
 | S→C | `guest:expired` | `{}` | 만료, 서버가 연결 종료 (#10 이벤트 시점, #11 소켓 타이머) |
 | S→C | `room:presence` | `{roomId, count}` | 라운지 채팅방에 **지금 접속 중인 사람 수**(같은 사람 여러 기기는 1명). 입장·퇴장·연결 끊김 때 방 전체에 전송 (#11) |
-| S→C | `match:request` / `match:accepted` | `{matchId, ...}` | 매칭 (#13) |
+| S→C | `match:request` | `{id, direction:'received', nickname, avatar_emoji, is_guest, similarity, common_tags, created_at}` | 대화 요청을 받음 (요청 대상의 모든 기기) (#13) |
+| S→C | `match:accepted` | `{matchId, roomId, title}` | 수락됨 → 양쪽 모든 기기, `title`은 받는 사람 기준 상대 닉네임 (#13) |
+| S→C | `match:rejected` | `{matchId}` | 요청자에게 (#13) |
 | S→C | `guest:warning` | `{remainingSec}` | 만료 5분 전 1회, 연결 시 이미 5분 이하면 바로 (#12) |
 | S→C | `signup:nudge` | `{reason}` | 메시지 수 기준 가입 유도 (#14) |
 
 ## 6. 매칭 알고리즘 (#13)
 
 ```
-vec(user) = { tagId: weight(1~3) * categoryWeight }
+vec(actor) = { tagId: weight(1~3) }        # 카테고리 가중치는 MVP에선 모두 1
 similarity(A, B) = Σ(A_i * B_i) / (‖A‖ * ‖B‖)
 ```
-1. 후보군: 현재 온라인 actor (Redis `online:actors`) 중 본인 제외
-2. 제외: 차단 관계(양방향), 이미 활성 1:1 방이 있는 상대, 최근 거절한 상대(24h)
-3. 유사도 상위 N명(기본 10) + 공통 태그 상위 3개 반환
-4. 후보가 부족하면 빈 목록 + "지금은 비슷한 사람이 없어요, 라운지를 둘러보세요" 안내 (PRD §3-2: **현재 접속 중인 Member·Guest만** 대상)
+1. 후보군: `online:actors` 중 본인 제외, 취향 있는 회원(PG `user_tastes`)·Guest(Redis `guest:tastes`) (PRD §3-2: **지금 접속 중인 Member·Guest만**)
+2. 제외: 차단 관계(양방향, 회원), 대화 중인 1:1 상대(PG·Redis 방 모두, 두 사람 다 남아 있는 방), 대기 중인 요청 상대(보낸·받은), 24시간 안에 거절한·거절당한 상대
+3. 유사도 > 0, 상위 10명 + 공통 태그 3개(두 사람 중요도 곱이 큰 순)
+4. 응답에는 실제 id 대신 `ref`(Redis `match:ref:{ref}`, 10분, 발급받은 사람만 사용). 요청 시 ref를 다시 확인하고 상대가 아직 접속 중인지 본다(`TARGET_OFFLINE`)
+5. 요청 저장: 회원↔회원 PG `match_history`(대기 요청은 `uq_match_pending_pair`로 하나만, 24시간 응답 없으면 `expired`) / 한쪽이라도 Guest면 Redis `match:{id}` + `match:pair`(SET NX로 하나만)
+6. 수락: 조건부 UPDATE(PG)·Lua 비교 후 변경(Redis)으로 **한 번만** → 회원끼리는 PG `chat_rooms`+`chat_members`, Guest가 끼면 Redis 방(`room:{id}`)
+7. 후보가 없으면 빈 목록 + "지금은 취향이 비슷한 사람이 없어요. 라운지를 둘러보세요"
    - 오프라인 Member 확장은 V2 검토 항목
+
+### 6-1. 대화 주제 (`GET /chat/rooms/:id/topics`)
+- 두 사람의 공통 태그 상위 3개 → 카테고리별 템플릿 문장 (예: "Oasis 노래 중 최애 곡은 뭐예요?"), 같은 카테고리가 겹치면 다른 템플릿
+- 공통 태그가 없거나 상대가 탈퇴한 방이면 일반 질문 2개
 
 ## 7. 디렉토리 구조 (목표, #2에서 적용)
 
@@ -207,7 +225,7 @@ src/
 │   ├── db.js
 │   ├── redis.js
 │   ├── routes/              # auth, guest, users, tastes, matching, lounges, chat, questions, reports
-│   ├── services/            # matching (이후 추가: guestSession, chat, orbit, migration)
+│   ├── services/            # matching, directRooms(Guest 1:1 방), online, actors, topics, guestSession, chat … (이후: migration)
 │   ├── socket/              # index.js, handlers/
 │   ├── middleware/          # memberAuth, guestAuth, optionalAuth, rateLimit, profanityFilter
 │   ├── jobs/                # guestExpiry

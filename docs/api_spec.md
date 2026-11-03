@@ -81,21 +81,27 @@
 ## Chat — #10
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
-| GET | `/chat/rooms` | O | `{ direct: [...], lounges: [...] }` — 1:1 방(회원)과 참여한 라운지 방(회원 PG·Guest Redis). Guest의 1:1은 #13 |
+| GET | `/chat/rooms` | O | `{ direct: [...], lounges: [...] }` — 1:1은 PG 방(회원끼리) + Redis 방(Guest가 낀 방, #13)을 최근 메시지순으로 합침. direct 항목: `{id, type, created_at, partner_nickname, partner_avatar_emoji, partner_is_guest, last_message, last_message_at}` |
 | GET | `/chat/rooms/:id/messages?before=&limit=` | O | 회원(PG) + Guest(Redis) 메시지를 시간순 병합, 최대 100개. 형식은 소켓 `message:new`와 같음. 만료된 Guest의 메시지는 제외 |
-| POST | `/chat/rooms/:id/leave` | O | 1:1 방 나가기 (둘 다 나가면 `closed_at`). 라운지는 400 → 라운지 나가기는 #11 |
-| GET | `/chat/rooms/:id/topics` | O | 공통 취향 기반 대화 주제 추천 (#13) |
+| POST | `/chat/rooms/:id/leave` | O | 1:1 방 나가기 (PG: 둘 다 나가면 `closed_at` / Redis: 둘 다 나가면 방·메시지 삭제). 라운지는 400 → 라운지 나가기는 #11 |
+| GET | `/chat/rooms/:id/topics` | O | `{ topics: [문장 1~3개] }` — 공통 취향 템플릿, 없으면 일반 질문 2개. 라운지 방은 400 (#13) |
 
-- 접근: 1:1은 참여 중인 회원만, 라운지 방은 회원·Guest 모두. 접근할 수 없는 방은 404
+- 접근: 1:1은 참여 중인 사람만(PG 방은 회원, Redis 방은 회원·Guest), 라운지 방은 회원·Guest 모두. 접근할 수 없는 방은 404
 - 실시간 송수신은 Socket.io (`docs/system_design.md` §5)
 
 ## Matching — #13
+- 회원·Guest 모두(`optionalAuth`). 실제 user_id·guestId는 내려주지 않는다 (후보는 `ref`, 요청은 `id`)
+- 요청 형태(`R`): `{ id, direction: 'received' | 'sent', nickname, avatar_emoji, is_guest, similarity(0~100), common_tags: [이름 최대 3개], created_at }`
+
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
-| GET | `/matching/candidates` | O | 추천 후보 (유사도, 공통 태그 3개) |
-| POST | `/matching/requests` | O | 매칭 요청 `{targetActorRef}` |
-| POST | `/matching/requests/:id/accept` | O | 수락 → 1:1 방 생성 |
-| POST | `/matching/requests/:id/reject` | O | 거절 |
+| GET | `/matching/candidates` | O | `{ candidates: [{ ref, nickname, avatar_emoji, is_guest, similarity, common_tags }], message? }` — 지금 접속 중, 유사도 상위 10명. ref는 10분, 발급받은 사람만 사용 |
+| GET | `/matching/requests` | O | `{ received: [R], sent: [R] }` — 대기 중인 요청 (회원 요청은 24시간 지나면 만료) |
+| POST | `/matching/requests` | O | body `{ ref }` → `201 R(sent)`. 상대에게 소켓 `match:request`. 오류: 404 `REF_INVALID`(위조·만료·남의 ref·차단), 409 `TARGET_OFFLINE` / `ALREADY_REQUESTED` / `ALREADY_RECEIVED` / `NOT_AVAILABLE`(대화 중·24시간 내 거절) |
+| POST | `/matching/requests/:id/accept` | O | 받은 요청만 → `{ matchId, roomId, title, status }`. 양쪽에 `match:accepted`. 회원끼리 PG 방, Guest가 끼면 Redis 방. 이미 처리·만료된 요청은 404 |
+| POST | `/matching/requests/:id/reject` | O | 받은 요청만 → `{ matchId, status }`. 요청자에게 `match:rejected`. 24시간(Guest가 끼면 Guest 만료까지) 서로 추천하지 않음 |
+
+- 예전 `POST /matching/find`, `/matching/request/:targetId`, `/matching/:id/accept·reject`, `GET /matching/my`는 삭제
 
 ## Today's Question — #15
 | Method | Path | 인증 | 설명 |
