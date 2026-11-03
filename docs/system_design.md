@@ -111,14 +111,15 @@ sequenceDiagram
 | `match:pair:{a}\|{b}` | String | 두 사람 사이 요청 하나(SET NX) — 대기·거절 상태 동안 다시 요청 불가 | 동일 (#13) |
 | `actor:matches:{actorKey}` | Set | 보낸·받은 Redis 요청 matchId (회원 목록은 읽을 때 정리) | Guest는 본인 만료 시각 (#13) |
 | `guest:answers:{guestId}` | Hash | questionId → 답변 | 동일 |
-| `guest:msgcount:{guestId}` | String | 보낸 메시지 수 (가입 유도 트리거) | 동일 |
+| `guest:msgcount:{guestId}` | String | 보낸 메시지 수 — 20개째 INCR 결과일 때만 `signup:nudge` 1회 | 동일 (#14) |
+| `guest:upgrade:{guestId}` | String | 가입 전환 선점(SET NX) — 같은 토큰으로 동시에 가입해도 한 요청만 이전 | 60초 또는 전환 완료 시 삭제 (#14) |
 
 ### 4-2. 원칙
 - **절대 시간제**: `expiresAt = createdAt + 30분`, 갱신하지 않는다.
 - **TTL에만 의존하지 않는다**: 모든 HTTP 요청·소켓 이벤트에서 `expiresAt`을 서버가 직접 확인.
 - **만료 시점에 즉시 종료한다**: Guest 소켓이 연결되면 `expiresAt - now` 후에 실행되는 만료 타이머를 등록한다. 타이머는 `guest:expired` 이벤트를 **먼저 보낸 뒤** 연결을 끊는다(끊은 뒤에는 이벤트를 받을 수 없음).
 - **30초 정리 작업은 보조 수단**이다 (`jobs/guestExpiry.js`, 서버 프로세스 안 `setInterval`, 주기 `GUEST_CLEANUP_INTERVAL_MS`). 만료됐거나 세션이 없어진(다른 기기에서 종료) Guest 소켓 종료, 라운지 Sorted Set의 만료 Guest 제거, 라운지 Guest 메시지 리스트에서 만료 작성자 메시지 제거(LREM — 동시에 들어오는 새 메시지를 잃지 않게 리스트를 다시 쓰지 않음). 세션·취향·참여 목록 키는 세션과 같은 시각의 TTL로 사라진다 (#12)
-- **만료 5분 전 `guest:warning`**: 소켓 타이머로 1회, 연결 시 이미 5분 이하면 바로 (#12). 앱은 배너, #14에서 가입 유도 모달
+- **만료 5분 전 `guest:warning`**: 소켓 타이머로 1회, 연결 시 이미 5분 이하면 바로 (#12). 앱은 가입 유도 모달 (#14)
 - **수신자도 확인한다**: 방에 메시지를 브로드캐스트할 때 수신자 중 만료된 Guest 소켓은 제외(그리고 즉시 종료)한다.
 - **로그 금지**: Guest 메시지 본문은 console/에러 로그/분석 이벤트에 남기지 않는다. 로거에서 `content` 필드 마스킹.
 - 신고 시에만 해당 메시지 스냅샷을 `reports`에 저장 (예외).
@@ -134,20 +135,27 @@ sequenceDiagram
 > 라운지 히스토리 조회 시 PostgreSQL + Redis를 시간순 병합해서 반환.
 
 ### 4-4. Guest → 회원 전환 (#14)
-1. Guest가 `POST /api/auth/register` 요청 시 `X-Guest-Token`을 함께 보냄
-2. 서버 트랜잭션:
-   - users 생성
-   - `guest:tastes` → `user_tastes` INSERT
-   - `actor:rooms:guest:{id}`의 방(Redis 1:1 방) → 상대가 **회원**이면 `chat_rooms`(direct) + `chat_members` 2행을 PG에 새로 생성 / 상대가 **Guest**면 방은 Redis에 그대로 두고 본인만 회원으로 표시 (#14에서 확정)
-   - `guest:lounges`의 라운지 → `lounge_members` INSERT, `lounge:{id}:guests`에서 제거
-   - 라운지 `room:{id}:guestmsgs`·1:1 `room:{id}:msgs`에서 **가입한 Guest 본인이 보낸 메시지만** → `messages` INSERT (sender = 새 userId)
-   - 같은 방의 **Member 메시지**는 원래 작성자(sender_id)를 그대로 유지한다 (이미 PG에 있으면 그대로, Redis에 있으면 원 작성자로 INSERT)
-   - **다른 Guest(가입하지 않은 상대)의 메시지는 PostgreSQL로 이전하지 않는다** — Guest 메시지 보관 정책 유지. 해당 Guest 만료 시 Redis에서 삭제
-   - `guest:answers` → `question_answers` INSERT
-3. Redis guest 키 삭제, 소켓 재인증(`auth:upgrade` 이벤트)
-4. 상대방 화면에서는 닉네임·캐릭터가 그대로 유지됨 (가입 시 Guest 닉네임 유지 옵션 기본 ON)
+**가입 유도:** 채팅방 "대화 저장하기", 만료 5분 전(`guest:warning`), 보낸 메시지 20개(`signup:nudge`) → 가입 유도 모달. "나중에"를 누르면 남은 시간 동안 계속 이용. My Orbit(Guest)에도 "가입하고 이어가기"
+**가입 화면:** 같은 RegisterScreen을 Guest 닉네임(12자 넘으면 잘라서)·캐릭터로 미리 채움(수정 가능), 요청에 `X-Guest-Token`이 함께 감
 
-> 상대방도 Guest인 1:1 방은, 가입한 쪽 기록만 남고 상대 Guest 만료 시 상대 메시지는 "사라진 궤도의 메시지"로 표시 여부를 #14에서 결정.
+1. `POST /api/auth/register` + `X-Guest-Token` → 세션이 유효하면 `guest:upgrade:{guestId}` 선점(SET NX, 실패 시 409 `UPGRADE_IN_PROGRESS`). 만료·위조 토큰이면 이전 없이 일반 가입
+2. Redis에서 이전할 데이터를 먼저 읽는다 (트랜잭션 안에서 Redis를 기다리지 않게)
+3. **PG 한 트랜잭션** (`services/guestUpgrade.js`):
+   - users 생성
+   - `guest:tastes` → `user_tastes`
+   - `guest:lounges` → `lounge_members` (이미 정원에 Guest로 포함된 자리라 정원 확인 없음)
+   - 라운지 `room:{id}:guestmsgs`의 **본인 메시지만** → `messages` (같은 id·시각, sender = 새 userId)
+   - **회원과의 1:1 Redis 방** → 같은 roomId로 `chat_rooms` + `chat_members` 2행(방 단위 표시 이름·캐릭터 = 방에서 쓰던 값) + 방의 모든 메시지(회원 메시지는 원 작성자, 본인 메시지는 새 userId, 순서 유지)
+   - 하나라도 실패하면 회원 생성까지 되돌리고 선점 해제 → Guest는 그대로, 다시 시도 가능
+4. **커밋 후 Redis 정리** (실패해도 가입은 성공, 남은 키는 세션 만료 시각에 TTL로 사라짐)
+   - 세션 키부터 삭제 → 같은 토큰으로 다시 이전되지 않음
+   - 옮긴 라운지 메시지 LREM, 옮긴 1:1 방 삭제
+   - **Guest끼리 방은 Redis에 그대로**: Lua 한 번에 참여자·메시지 작성자 키를 `member:{userId}`로, `is_guest=false`로 바꾸고 방 만료를 **남은 Guest의 만료 시각**으로
+   - 취향·표시 정보·라운지 참여·대기 중인 매칭 요청(옮기지 않음)·메시지 수 정리
+   - 그 Guest의 소켓은 이벤트 없이 끊는다 (`guest:expired`를 보내면 앱이 만료 화면으로 감)
+5. 앱: 회원 토큰 저장(Guest 토큰 삭제) → `/auth/me` → 소켓을 회원 토큰으로 다시 연결(별도 `auth:upgrade` 이벤트 없음). 화면 구독은 소켓이 바뀌어도 유지되고, 채팅방에서 가입했으면 그 방으로 돌아간다
+6. 상대 화면: 닉네임·캐릭터 그대로, Guest 배지만 빠짐
+- 이전하지 않음: 다른 Guest의 메시지, 오늘의 질문 답변(#15)
 
 ## 5. 실시간(Socket.io) 이벤트
 
@@ -170,7 +178,7 @@ sequenceDiagram
 | S→C | `match:accepted` | `{matchId, roomId, title}` | 수락됨 → 양쪽 모든 기기, `title`은 받는 사람 기준 상대 닉네임 (#13) |
 | S→C | `match:rejected` | `{matchId}` | 요청자에게 (#13) |
 | S→C | `guest:warning` | `{remainingSec}` | 만료 5분 전 1회, 연결 시 이미 5분 이하면 바로 (#12) |
-| S→C | `signup:nudge` | `{reason}` | 메시지 수 기준 가입 유도 (#14) |
+| S→C | `signup:nudge` | `{reason: 'messages'}` | Guest가 보낸 메시지 20개째에 1회, 같은 Guest의 모든 기기 (#14) |
 
 ## 6. 매칭 알고리즘 (#13)
 

@@ -21,7 +21,7 @@
 ## Auth — #4, #14
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
-| POST | `/auth/register` | - (선택: `X-Guest-Token`) | `{email, password(8자~72바이트), nickname(2~12자), avatar_id?}` → `201 {token, user:{nickname, avatar_id}}`. 이메일은 소문자 저장, 중복 409, 없는 캐릭터 400. Guest 데이터 이전은 #14 |
+| POST | `/auth/register` | - (선택: `X-Guest-Token`) | `{email, password(8자~72바이트), nickname(2~12자), avatar_id?}` → `201 {token, user:{nickname, avatar_id}, migrated}`. 이메일은 소문자 저장, 중복 409, 없는 캐릭터 400. **#14:** 유효한 Guest 토큰이면 취향·라운지·대화를 이전하고 `migrated: {tastes, lounges, lounge_messages, direct_rooms}`(아니면 `null`). 같은 토큰으로 동시 가입 409 `UPGRADE_IN_PROGRESS`, Redis 끊김 503, 이전 실패 500(가입도 취소, Guest 유지) |
 | POST | `/auth/login` | - | `{email, password}` → `{token, user}` (이메일 대소문자 무시), 실패 401, 정지 403 |
 | GET | `/auth/me` | O | `{type: 'member' \| 'guest', nickname, avatar_id, avatar_emoji, has_tastes, expires_at?(Guest)}` |
 
