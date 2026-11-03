@@ -19,6 +19,7 @@ const optionalAuth = require('./middleware/optionalAuth');
 const memberAuth = require('./middleware/memberAuth');
 const { connectRedis } = require('./redis');
 const { startGuestCleanup } = require('./jobs/guestExpiry');
+const { resetOnline } = require('./services/online');
 
 const app = express();
 const server = http.createServer(app);
@@ -39,12 +40,12 @@ app.use('/api/home', optionalAuth, homeRoutes); // #8
 app.use('/api/tastes', optionalAuth, tasteRoutes);
 app.use('/api/lounges', optionalAuth, loungeRoutes); // #11: Guest 참여는 Redis
 app.use('/api/questions', optionalAuth, questionRoutes); // #15
-app.use('/api/chat', optionalAuth, chatRoutes); // #10: 1:1 목록은 회원만, 기록 조회는 Guest도
+app.use('/api/chat', optionalAuth, chatRoutes); // #10, #13: Guest가 낀 1:1 방은 Redis
+app.use('/api/matching', optionalAuth, matchingRoutes); // #13: Guest 요청·방은 Redis
 
 // 회원 전용 — 각 기능 이슈에서 Guest 지원 시 optionalAuth로 전환
-// users #17, matching #13, reports #16
+// users #17, reports #16
 app.use('/api/users', memberAuth, userRoutes);
-app.use('/api/matching', memberAuth, matchingRoutes);
 app.use('/api/reports', memberAuth, reportRoutes);
 
 // Socket.io
@@ -58,8 +59,10 @@ server.listen(PORT, () => {
 });
 
 // Redis가 없으면 Guest 기능만 503, 회원 기능은 계속 동작
+// 연결되면 이전 실행의 온라인 상태를 비운다 (단일 서버 MVP, #13)
 connectRedis()
   .then(() => console.log('Redis connected'))
+  .then(resetOnline)
   .catch((err) => console.error('Redis 연결 실패 — Guest 기능 사용 불가:', err.message));
 
 module.exports = { app, server };

@@ -2,9 +2,11 @@ const crypto = require('crypto');
 const db = require('../db');
 const { getRedis } = require('../redis');
 const { filterMessage, containsBadWords } = require('../middleware/profanityFilter');
+const { pushDirectMessage, readDirectMessages } = require('./directRooms');
 
 // 메시지 저장·조회 — docs/system_design.md §4-3
 // 회원 메시지: PG messages / Guest 메시지: Redis room:{roomId}:guestmsgs (PG·로그에 남기지 않음)
+// Guest가 낀 1:1 방: 모든 메시지가 Redis room:{roomId}:msgs (directRooms.js)
 // 클라이언트에는 실제 user_id·guestId 대신 is_mine만 내려준다
 
 const MAX_LENGTH = 1000;
@@ -24,6 +26,8 @@ function normalizeContent(content) {
 
 // 저장 후 보낼 메시지 (senderKey는 서버 내부용, toClient에서 is_mine으로 바뀜)
 async function saveMessage(room, actor, content) {
+  // Guest가 낀 1:1 방(#13)은 회원 메시지까지 모두 Redis
+  if (room.store === 'redis') return pushDirectMessage(room, senderKeyOf(actor), content);
   if (actor.type === 'guest') {
     const message = {
       id: crypto.randomUUID(),
@@ -73,6 +77,7 @@ function toClient(message, viewer) {
 
 // 기록: PG(회원) + Redis(Guest, 만료 전 작성자만)를 시간순으로 합쳐 before 이전 limit개
 async function getMessages(room, viewer, { before = null, limit = 50 } = {}) {
+  if (room.store === 'redis') return (await readDirectMessages(room, { before, limit })).map((m) => toClient(m, viewer));
   const params = [room.id];
   let where = 'm.room_id = $1';
   if (before) {
