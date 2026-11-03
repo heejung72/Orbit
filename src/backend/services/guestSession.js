@@ -61,12 +61,19 @@ async function findGuestSession(token) {
 async function deleteGuestSession(token) {
   const redis = getRedis();
   const guestId = await redis.hGet(keyOf(token), 'guestId');
-  if (guestId) {
-    await removeGuestFromLounges(guestId);
-    await removeGuestRooms(guestId);
-    await removeGuestMatches(guestId);
-  }
-  await redis.del(guestId ? [keyOf(token), guestTastesKey(guestId), guestProfileKey(guestId)] : [keyOf(token)]);
+  if (guestId) await removeGuestData(guestId);
+  await redis.del(keyOf(token));
 }
 
-module.exports = { createGuestSession, findGuestSession, deleteGuestSession };
+// 세션 키를 뺀 Guest 임시 데이터 정리 (둘러보기 종료, 가입 전환 #14)
+async function removeGuestData(guestId) {
+  await removeGuestFromLounges(guestId);
+  await removeGuestRooms(guestId);
+  await removeGuestMatches(guestId);
+  await getRedis().del([guestTastesKey(guestId), guestProfileKey(guestId)]);
+}
+
+// 세션만 지운다 — 토큰을 바로 무효로 (가입 전환 커밋 직후, 같은 토큰으로 두 번 옮기지 않게)
+const endGuestToken = (token) => getRedis().del(keyOf(token));
+
+module.exports = { createGuestSession, findGuestSession, deleteGuestSession, removeGuestData, endGuestToken };
