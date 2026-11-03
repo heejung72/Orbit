@@ -8,7 +8,8 @@ import RootNavigator from './navigation/RootNavigator';
 import { secureStorage, clearSession } from './services/storage';
 import { api, setOnSessionExpired } from './services/api';
 import { connectSocket, disconnectSocket } from './services/socket';
-import GuestWarningBanner from './components/GuestWarningBanner';
+import SignupNudgeModal from './components/SignupNudgeModal';
+import { setSignupNudgeHandler } from './services/signupNudge';
 import MatchRequestBanner from './components/MatchRequestBanner';
 import { navigationRef, openChatRoom } from './navigation/navigationRef';
 import { colors, spacing, typography } from './theme';
@@ -19,14 +20,14 @@ export default function App() {
   const [needsTaste, setNeedsTaste] = useState(false);
   const [guestExpiresAt, setGuestExpiresAt] = useState(null); // Guest 세션 만료 시각(ms)
   const [orbitExpired, setOrbitExpired] = useState(false); // true면 로그아웃 화면 첫 장이 "궤도가 사라졌어요"
-  const [warning, setWarning] = useState(null); // 만료 5분 전 배너 { remainingSec }
+  const [nudge, setNudge] = useState(null); // Guest 가입 유도 모달 { reason, remainingSec? } (#14)
   const [matchRequest, setMatchRequest] = useState(null); // 받은 대화 요청 알림 (#13)
 
   // 세션 종료 공통. Guest 만료면 안내 화면, 회원 토큰 무효·로그아웃이면 Welcome
   // 경로: 소켓 guest:expired·인증 거절 / HTTP GUEST_EXPIRED·UNAUTHORIZED / 만료 시각 도달 / 앱 복귀 시 확인
   const endSession = useCallback(async (reason) => {
     await clearSession();
-    setWarning(null);
+    setNudge(null);
     setMatchRequest(null);
     setOrbitExpired(reason === 'guest');
     setAuthState('loggedOut');
@@ -57,6 +58,7 @@ export default function App() {
 
   useEffect(() => {
     setOnSessionExpired((code) => endSession(code === 'GUEST_EXPIRED' ? 'guest' : 'member'));
+    setSignupNudgeHandler(setNudge);
     (async () => {
       try {
         const isMember = !!(await secureStorage.get('token'));
@@ -81,7 +83,9 @@ export default function App() {
     if (authState === 'member' || authState === 'guest') {
       connectSocket({
         onSessionExpired: endSession,
-        onGuestWarning: (w) => setWarning(w || {}),
+        // 가입 유도 모달 — 만료 5분 전(#12 이벤트)과 메시지 20개(#14)
+        onGuestWarning: (w) => setNudge({ reason: 'warning', remainingSec: w?.remainingSec }),
+        onSignupNudge: () => setNudge({ reason: 'messages' }),
         onMatchRequest: (r) => navigationRef.getCurrentRoute()?.name !== 'Matching' && setMatchRequest(r),
         onMatchAccepted: (a) => {
           setMatchRequest(null);
@@ -107,6 +111,13 @@ export default function App() {
       sub.remove();
     };
   }, [authState, guestExpiresAt, endSession]);
+
+  // 가입 화면으로 — 채팅방에서 열었으면 가입 후 그 방으로 돌아오게
+  const openUpgrade = () => {
+    if (!navigationRef.isReady()) return;
+    const current = navigationRef.getCurrentRoute();
+    navigationRef.navigate('Upgrade', current?.name === 'ChatRoom' ? { returnTo: { name: 'ChatRoom', params: current.params } } : {});
+  };
 
   if (authState === 'loading') return null;
   if (authState === 'offline') {
@@ -136,7 +147,14 @@ export default function App() {
           onLogout={() => endSession('member')}
         />
       </NavigationContainer>
-      {isGuest && warning && <GuestWarningBanner remainingSec={warning.remainingSec} onClose={() => setWarning(null)} />}
+      <SignupNudgeModal
+        nudge={isGuest ? nudge : null}
+        onLater={() => setNudge(null)}
+        onSignup={() => {
+          setNudge(null);
+          openUpgrade();
+        }}
+      />
       {isLoggedIn && matchRequest && (
         <MatchRequestBanner
           request={matchRequest}

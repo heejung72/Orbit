@@ -10,6 +10,7 @@ export const colors = {
   textMuted: '#888888',
   border: '#E0E0E0',
   danger: '#E5484D', // 남은 시간이 얼마 없을 때 등 주의 표시 (#12)
+  overlay: 'rgba(0, 0, 0, 0.4)', // 모달 뒤 배경 (#14)
 };
 
 export const spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 };
