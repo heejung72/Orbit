@@ -90,13 +90,23 @@ async function listDirectRooms(key) {
 }
 
 // 대화 중인 상대 actorKey (두 사람 모두 나가지 않은 방)
+// 회원 목록 키는 TTL이 없어, 채팅 목록을 열지 않아도 여기서 사라진 방을 정리한다
 async function activePartners(key) {
+  const redis = getRedis();
+  const ids = await redis.sMembers(actorRoomsKey(key));
+  if (ids.length === 0) return new Set();
+  const multi = redis.multi();
+  for (const id of ids) multi.hGetAll(roomKey(id));
+  const results = await multi.exec();
   const keys = new Set();
-  for (const id of await getRedis().sMembers(actorRoomsKey(key))) {
-    const room = await getDirectRoom(id);
-    if (!room || room.left.size > 0) continue;
+  const gone = [];
+  ids.forEach((id, i) => {
+    const room = parseRoom(id, results[i]);
+    if (!room) return gone.push(id);
+    if (room.left.size > 0) return;
     for (const m of room.members) if (m.key !== key) keys.add(m.key);
-  }
+  });
+  if (gone.length) await redis.sRem(actorRoomsKey(key), gone);
   return keys;
 }
 
