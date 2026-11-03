@@ -3,9 +3,12 @@ const { findGuestSession } = require('../services/guestSession');
 const { getRoomForActor } = require('../services/chatAccess');
 const { toUuid } = require('../utils/validate');
 const { normalizeContent, saveMessage, toClient } = require('../services/chat');
+const { actorKey, actorRoom } = require('../services/actors');
+const { markOnline, markOffline } = require('../services/online');
 
 // Socket.io — docs/system_design.md §5
 // C→S: room:join · room:leave · message:send · typing  /  S→C: message:new · typing · guest:expired · room:presence
+// 매칭(#13): 연결 중인 actor는 online:actors에 기록, actor 전용 방(actor:{key})으로 match:* 이벤트를 받는다
 // 결과·오류는 ack 콜백 { ok, code?, message? } 로 돌려준다
 // 메시지 본문은 어떤 로그에도 남기지 않는다 (오류 로그는 err.message만)
 // Guest: 만료 5분 전 guest:warning, 만료 시각 guest:expired (소켓 타이머) + 30초 정리 작업(jobs/guestExpiry.js)
@@ -72,6 +75,16 @@ function setupSocket(io) {
   io.on('connection', (socket) => {
     const { actor } = socket.data;
     const loungeRooms = new Set(); // 이 소켓이 들어가 있는 라운지 방 (퇴장·끊김 때 인원 갱신용)
+    const key = actorKey(actor);
+    socket.join(actorRoom(key));
+    // 온라인 기록이 성공한 소켓만 끊길 때 줄인다 (Redis가 끊겨 기록 못 한 연결이 다른 기기 수를 깎지 않게)
+    const counted = markOnline(key).then(
+      () => true,
+      (err) => {
+        console.error('온라인 상태 기록 실패:', err.message);
+        return false;
+      }
+    );
 
     // Guest는 만료 시각에 바로 종료 — 이벤트를 보내지 않는 Guest도 접속 인원에서 빠지게 (끊김 → 아래 disconnect에서 인원 갱신)
     const expiryTimer = actor.type === 'guest' ? setTimeout(() => expire(socket), Math.max(actor.expiresAt - Date.now(), 0)) : null;
@@ -88,6 +101,7 @@ function setupSocket(io) {
       clearTimeout(expiryTimer);
       clearTimeout(warningTimer);
       for (const roomId of loungeRooms) broadcastPresence(io, roomId);
+      counted.then((ok) => ok && markOffline(key)).catch((err) => console.error('온라인 상태 해제 실패:', err.message));
     });
 
     // 모든 이벤트 처리 전 Guest 세션 재확인 (시간 만료·직접 종료·Redis 정리 모두 여기서 걸림)

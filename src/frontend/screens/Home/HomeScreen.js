@@ -138,8 +138,7 @@ export default function HomeScreen() {
           <Pressable style={styles.quick} onPress={() => navigation.navigate('Lounge')} accessibilityRole="button">
             <Text style={styles.quickText}>라운지 둘러보기</Text>
           </Pressable>
-          {/* 매칭 화면은 #13 — 지금은 대화 목록으로 */}
-          <Pressable style={styles.quick} onPress={() => navigation.navigate('Chat')} accessibilityRole="button">
+          <Pressable style={styles.quick} onPress={() => navigation.navigate('Matching')} accessibilityRole="button">
             <Text style={styles.quickText}>사람 만나기</Text>
           </Pressable>
         </View>

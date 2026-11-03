@@ -10,6 +10,7 @@ import ChatRoomScreen from '../screens/Chat/ChatRoomScreen';
 import LoungeChatScreen from '../screens/Lounge/LoungeChatScreen';
 import TodayQuestionScreen from '../screens/TodayQuestion/TodayQuestionScreen';
 import OrbitExpiredScreen from '../screens/Expired/OrbitExpiredScreen';
+import MatchingScreen from '../screens/Chat/MatchingScreen';
 import MainTabs from './MainTabs';
 import { colors } from '../theme';
 
@@ -50,6 +51,7 @@ export default function RootNavigator({ isLoggedIn, isGuest, needsTaste, orbitEx
         <>
           {needsTaste ? [taste, main] : [main, taste]}
           <Stack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ title: '채팅' }} />
+          <Stack.Screen name="Matching" component={MatchingScreen} options={{ title: '사람 만나기' }} />
           <Stack.Screen name="LoungeChat" component={LoungeChatScreen} options={{ title: '라운지' }} />
           <Stack.Screen name="TodayQuestion" component={TodayQuestionScreen} options={{ title: '오늘의 질문' }} />
         </>

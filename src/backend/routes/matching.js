@@ -1,144 +1,77 @@
 const express = require('express');
-const db = require('../db');
-const { findMatches } = require('../services/matching');
-const { isBlockedBetween } = require('../services/blocks');
 const { toUuid } = require('../utils/validate');
+const { emitToActor, actorKey } = require('../services/actors');
+const matching = require('../services/matching');
 
+// /api/matching — optionalAuth 아래 (회원·Guest) #13
+// 실제 user_id·guestId는 내려주지 않는다: 후보는 ref, 요청은 matchId로만
+// 실시간: 대상에게 match:request, 수락 시 양쪽에 match:accepted, 거절 시 요청자에게 match:rejected
 const router = express.Router();
 
-// 매칭 후보 찾기
-// TODO(#13): 실제 user_id 대신 익명 후보 참조값(targetActorRef) 사용, GET /matching/candidates 로 이동
-router.post('/find', async (req, res) => {
+function fail(res, err, where) {
+  if (err.status) return res.status(err.status).json({ error: err.message, code: err.code });
+  if (err.code === 'REDIS_UNAVAILABLE') return res.status(503).json({ error: '잠시 후 다시 시도해주세요', code: 'UNAVAILABLE' });
+  console.error(`${where} 실패:`, err.message);
+  res.status(500).json({ error: '서버 오류가 발생했습니다' });
+}
+
+// 추천 후보 (지금 접속 중, 유사도 상위 10명)
+router.get('/candidates', async (req, res) => {
   try {
-    const matches = await findMatches(req.userId);
-    if (matches.length === 0) {
-      return res.json({ matches: [], message: '지금은 취향이 비슷한 사람이 없어요' });
-    }
-
-    const users = await db.query(
-      `SELECT u.id, u.nickname, a.emoji AS avatar_emoji FROM users u JOIN avatars a ON a.id = u.avatar_id
-       WHERE u.id = ANY($1)`,
-      [matches.map((m) => m.userId)]
-    );
-    const allTagIds = [...new Set(matches.flatMap((m) => m.commonTagIds))];
-    const tags = await db.query('SELECT id, name FROM taste_tags WHERE id = ANY($1)', [allTagIds]);
-    const tagName = new Map(tags.rows.map((t) => [t.id, t.name]));
-
-    const result = matches.map((m) => {
-      const user = users.rows.find((u) => u.id === m.userId);
-      return {
-        ...user,
-        similarity_score: Math.round(m.score * 100),
-        common_tags: m.commonTagIds.map((id) => tagName.get(id)),
-      };
-    });
-    res.json({ matches: result });
+    const candidates = await matching.getCandidates(req.actor);
+    res.json({ candidates, ...(candidates.length ? {} : { message: '지금은 취향이 비슷한 사람이 없어요. 라운지를 둘러보세요' }) });
   } catch (err) {
-    res.status(500).json({ error: '서버 오류가 발생했습니다' });
+    fail(res, err, 'GET /api/matching/candidates');
   }
 });
 
-// 매칭 요청
-router.post('/request/:targetId', async (req, res) => {
-  const targetId = toUuid(req.params.targetId);
-  if (!targetId) return res.status(404).json({ error: '상대를 찾을 수 없습니다' });
-  if (targetId === req.userId) return res.status(400).json({ error: '자기 자신에게는 요청할 수 없어요' });
+// 대기 중인 요청 { received, sent }
+router.get('/requests', async (req, res) => {
   try {
-    // 차단 관계(양방향)면 요청 불가 — 차단 사실이 드러나지 않도록 404와 같은 응답
-    if (await isBlockedBetween(req.userId, targetId)) {
-      return res.status(404).json({ error: '상대를 찾을 수 없습니다' });
-    }
-
-    const score = Math.max(0, Math.min(1, (Number(req.body.similarity_score) || 0) / 100));
-    const { rows } = await db.query(
-      `INSERT INTO match_history (requester_id, target_id, similarity) VALUES ($1, $2, $3)
-       ON CONFLICT DO NOTHING
-       RETURNING id`,
-      [req.userId, targetId, score]
-    );
-    if (rows.length === 0) return res.status(409).json({ error: '이미 대화 요청을 보냈어요' });
-
-    res.status(201).json({ matchId: rows[0].id, status: 'pending' });
+    res.json(await matching.listRequests(req.actor));
   } catch (err) {
-    if (err.code === '23503') return res.status(404).json({ error: '상대를 찾을 수 없습니다' });
-    res.status(500).json({ error: '서버 오류가 발생했습니다' });
+    fail(res, err, 'GET /api/matching/requests');
   }
 });
 
-// 매칭 수락 → 1:1 채팅방 생성 (방 단위 익명 표시 정보 저장)
-router.post('/:matchId/accept', async (req, res) => {
-  const matchId = toUuid(req.params.matchId);
-  if (!matchId) return res.status(404).json({ error: '대화 요청을 찾을 수 없습니다' });
-  const client = await db.pool.connect();
+// 대화 요청 { ref }
+router.post('/requests', async (req, res) => {
   try {
-    await client.query('BEGIN');
-    const match = await client.query(
-      `UPDATE match_history SET status = 'accepted', responded_at = now()
-       WHERE id = $1 AND target_id = $2 AND status = 'pending'
-       RETURNING requester_id, target_id`,
-      [matchId, req.userId]
-    );
-    if (match.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: '대화 요청을 찾을 수 없습니다' });
-    }
-    // 요청 이후 차단이 생겼다면 방을 만들지 않고 요청을 취소 처리
-    if (await isBlockedBetween(match.rows[0].requester_id, match.rows[0].target_id, client)) {
-      await client.query(`UPDATE match_history SET status = 'cancelled' WHERE id = $1`, [matchId]);
-      await client.query('COMMIT');
-      return res.status(404).json({ error: '대화 요청을 찾을 수 없습니다' });
-    }
-
-    const room = await client.query(`INSERT INTO chat_rooms (type) VALUES ('direct') RETURNING id`);
-    const roomId = room.rows[0].id;
-    await client.query(
-      `INSERT INTO chat_members (room_id, user_id, display_name, avatar_id)
-       SELECT $1, u.id, u.nickname, u.avatar_id FROM users u WHERE u.id = ANY($2)`,
-      [roomId, [match.rows[0].requester_id, match.rows[0].target_id]]
-    );
-    await client.query('UPDATE match_history SET room_id = $1 WHERE id = $2', [roomId, matchId]);
-    await client.query('COMMIT');
-
-    res.json({ matchId, chatRoomId: roomId, status: 'accepted' });
+    const { targetKey, forRequester, forTarget } = await matching.createRequest(req.actor, req.body?.ref);
+    emitToActor(req.app.get('io'), targetKey, 'match:request', forTarget);
+    res.status(201).json(forRequester);
   } catch (err) {
-    await client.query('ROLLBACK');
-    res.status(500).json({ error: '서버 오류가 발생했습니다' });
-  } finally {
-    client.release();
+    fail(res, err, 'POST /api/matching/requests');
   }
 });
 
-// 매칭 거절
-router.post('/:matchId/reject', async (req, res) => {
-  const matchId = toUuid(req.params.matchId);
-  if (!matchId) return res.status(404).json({ error: '대화 요청을 찾을 수 없습니다' });
+// 수락 → 1:1 방. 양쪽 모든 기기에 match:accepted { matchId, roomId, title(상대 닉네임) }
+router.post('/requests/:id/accept', async (req, res) => {
+  const matchId = toUuid(req.params.id);
+  if (!matchId) return res.status(404).json({ error: '대화 요청을 찾을 수 없어요', code: 'NOT_FOUND' });
   try {
-    await db.query(
-      `UPDATE match_history SET status = 'rejected', responded_at = now()
-       WHERE id = $1 AND target_id = $2 AND status = 'pending'`,
-      [matchId, req.userId]
-    );
-    res.json({ status: 'rejected' });
+    const { roomId, requesterKey, profiles } = await matching.acceptRequest(req.actor, matchId);
+    const meKey = actorKey(req.actor);
+    const io = req.app.get('io');
+    const titleFor = (key) => profiles.get(key === meKey ? requesterKey : meKey)?.nickname || '떠난 궤도';
+    emitToActor(io, requesterKey, 'match:accepted', { matchId, roomId, title: titleFor(requesterKey) });
+    emitToActor(io, meKey, 'match:accepted', { matchId, roomId, title: titleFor(meKey) });
+    res.json({ matchId, roomId, title: titleFor(meKey), status: 'accepted' });
   } catch (err) {
-    res.status(500).json({ error: '서버 오류가 발생했습니다' });
+    fail(res, err, 'POST /api/matching/requests/:id/accept');
   }
 });
 
-// 내 매칭 목록
-router.get('/my', async (req, res) => {
+// 거절 → 요청자에게 match:rejected { matchId }
+router.post('/requests/:id/reject', async (req, res) => {
+  const matchId = toUuid(req.params.id);
+  if (!matchId) return res.status(404).json({ error: '대화 요청을 찾을 수 없어요', code: 'NOT_FOUND' });
   try {
-    const result = await db.query(
-      `SELECT mh.id, mh.status, mh.similarity, mh.room_id, mh.created_at,
-              (mh.requester_id = $1) AS is_requester, u.nickname
-       FROM match_history mh
-       JOIN users u ON u.id = CASE WHEN mh.requester_id = $1 THEN mh.target_id ELSE mh.requester_id END
-       WHERE mh.requester_id = $1 OR mh.target_id = $1
-       ORDER BY mh.created_at DESC`,
-      [req.userId]
-    );
-    res.json(result.rows);
+    const requesterKey = await matching.rejectRequest(req.actor, matchId);
+    emitToActor(req.app.get('io'), requesterKey, 'match:rejected', { matchId });
+    res.json({ matchId, status: 'rejected' });
   } catch (err) {
-    res.status(500).json({ error: '서버 오류가 발생했습니다' });
+    fail(res, err, 'POST /api/matching/requests/:id/reject');
   }
 });
 
