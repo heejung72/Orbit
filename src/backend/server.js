@@ -18,6 +18,7 @@ const { setupSocket } = require('./socket');
 const optionalAuth = require('./middleware/optionalAuth');
 const memberAuth = require('./middleware/memberAuth');
 const { connectRedis } = require('./redis');
+const { startGuestCleanup } = require('./jobs/guestExpiry');
 
 const app = express();
 const server = http.createServer(app);
@@ -49,6 +50,7 @@ app.use('/api/reports', memberAuth, reportRoutes);
 // Socket.io
 setupSocket(io);
 app.set('io', io); // 라우트에서 소켓 방 정리용 (예: 1:1 방 나가기)
+startGuestCleanup(io); // 만료 Guest 소켓·Redis 항목 30초마다 정리 (#12)
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {

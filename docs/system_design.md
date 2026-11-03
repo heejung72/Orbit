@@ -78,14 +78,18 @@ sequenceDiagram
         B-->>A: 401 GUEST_EXPIRED
     end
 
-    Note over B: expiresAt 도달 (소켓별 만료 타이머)
-    B-->>A: socket 'guest:expired'
-    B->>B: 해당 guest 소켓 disconnect + 방 퇴장 브로드캐스트
-    B->>R: guest:* 키 삭제
-    A->>A: 로컬 토큰 삭제 → Welcome 이동
+    Note over B: 만료 5분 전 (소켓 타이머)
+    B-->>A: socket 'guest:warning' {remainingSec}
 
-    Note over B: 보조 스케줄러 (매 30초)
-    B->>B: 타이머에서 누락된 만료 소켓·키 정리
+    Note over B,R: expiresAt 도달
+    R->>R: 세션·취향·참여 목록 키 TTL 만료 (같은 시각)
+    B-->>A: socket 'guest:expired' (소켓별 만료 타이머)
+    B->>B: 해당 guest 소켓 disconnect + 라운지 접속 인원 갱신
+    A->>A: 로컬 토큰 삭제 → "궤도가 사라졌어요" 화면
+
+    Note over B: 정리 작업 (매 30초, jobs/guestExpiry.js)
+    B->>B: 만료·세션 없어진 Guest 소켓 종료
+    B->>R: lounge:{id}:guests 만료 항목 제거, room:{id}:guestmsgs 만료 작성자 메시지 LREM
 ```
 
 ### 4-1. Redis 키 설계 (Guest)
@@ -97,7 +101,7 @@ sequenceDiagram
 | `guest:rooms:{guestId}` | Set | 참여 중인 1:1 roomId | 동일 (#13) |
 | `guest:lounges:{guestId}` | Set | 참여한 loungeId | 동일 (#11) |
 | `lounge:{loungeId}:guests` | Sorted Set | guestId, score = 세션 expiresAt. 인원 계산 시 score > now만 셈, 참여 때 만료분 정리 | 마지막 참여 후 30분 (#11) |
-| `room:{roomId}:guestmsgs` | List | Guest 메시지 JSON(작성자 `guestId`·`expiresAt` 포함, 최근 500개). 읽을 때 만료된 작성자 메시지 제외 (#10) | 마지막 Guest 메시지 후 30분. 만료 즉시 삭제는 #12 |
+| `room:{roomId}:guestmsgs` | List | Guest 메시지 JSON(작성자 `guestId`·`expiresAt` 포함, 최근 500개). 읽을 때 만료된 작성자 메시지 제외 (#10) | 마지막 Guest 메시지 후 30분. 만료 작성자 메시지는 30초 정리 작업이 제거 (#12) |
 | `guest:answers:{guestId}` | Hash | questionId → 답변 | 동일 |
 | `guest:msgcount:{guestId}` | String | 보낸 메시지 수 (가입 유도 트리거) | 동일 |
 
@@ -105,7 +109,8 @@ sequenceDiagram
 - **절대 시간제**: `expiresAt = createdAt + 30분`, 갱신하지 않는다.
 - **TTL에만 의존하지 않는다**: 모든 HTTP 요청·소켓 이벤트에서 `expiresAt`을 서버가 직접 확인.
 - **만료 시점에 즉시 종료한다**: Guest 소켓이 연결되면 `expiresAt - now` 후에 실행되는 만료 타이머를 등록한다. 타이머는 `guest:expired` 이벤트를 **먼저 보낸 뒤** 연결을 끊는다(끊은 뒤에는 이벤트를 받을 수 없음).
-- **30초 스케줄러는 보조 수단**이다. 서버 재시작 등으로 타이머가 누락된 소켓과 Redis 키만 정리한다.
+- **30초 정리 작업은 보조 수단**이다 (`jobs/guestExpiry.js`, 서버 프로세스 안 `setInterval`, 주기 `GUEST_CLEANUP_INTERVAL_MS`). 만료됐거나 세션이 없어진(다른 기기에서 종료) Guest 소켓 종료, 라운지 Sorted Set의 만료 Guest 제거, 라운지 Guest 메시지 리스트에서 만료 작성자 메시지 제거(LREM — 동시에 들어오는 새 메시지를 잃지 않게 리스트를 다시 쓰지 않음). 세션·취향·참여 목록 키는 세션과 같은 시각의 TTL로 사라진다 (#12)
+- **만료 5분 전 `guest:warning`**: 소켓 타이머로 1회, 연결 시 이미 5분 이하면 바로 (#12). 앱은 배너, #14에서 가입 유도 모달
 - **수신자도 확인한다**: 방에 메시지를 브로드캐스트할 때 수신자 중 만료된 Guest 소켓은 제외(그리고 즉시 종료)한다.
 - **로그 금지**: Guest 메시지 본문은 console/에러 로그/분석 이벤트에 남기지 않는다. 로거에서 `content` 필드 마스킹.
 - 신고 시에만 해당 메시지 스냅샷을 `reports`에 저장 (예외).
@@ -139,7 +144,7 @@ sequenceDiagram
 ## 5. 실시간(Socket.io) 이벤트
 
 - **연결 인증**: `auth.token`(회원 JWT) 또는 `auth.guestToken`(Guest). 거절 시 `connect_error`의 `data.code` = `UNAUTHORIZED` / `GUEST_EXPIRED` / `UNAVAILABLE`
-- **Guest는 모든 이벤트 처리 전** 세션을 다시 확인하고, 만료(시간·직접 종료)면 `guest:expired`를 보낸 뒤 연결을 끊는다 (#10). 이벤트가 없어도 **소켓별 만료 타이머**가 `expiresAt`에 같은 처리를 한다 (#11, PR #28). 5분 전 알림·누락 소켓 정리 스케줄러는 #12
+- **Guest는 모든 이벤트 처리 전** 세션을 다시 확인하고, 만료(시간·직접 종료)면 `guest:expired`를 보낸 뒤 연결을 끊는다 (#10). 이벤트가 없어도 **소켓별 만료 타이머**가 `expiresAt`에 같은 처리를 한다 (#11, PR #28). 5분 전 알림·30초 정리 작업은 #12
 - **결과·오류는 ack 콜백** `{ ok: true, ... }` / `{ ok: false, code, message }` (`ROOM_NOT_FOUND`, `ROOM_CLOSED`, `INVALID_MESSAGE`, `UNAVAILABLE`, `SERVER_ERROR`)
 
 | 방향 | 이벤트 | payload | 설명 |
@@ -153,7 +158,7 @@ sequenceDiagram
 | S→C | `guest:expired` | `{}` | 만료, 서버가 연결 종료 (#10 이벤트 시점, #11 소켓 타이머) |
 | S→C | `room:presence` | `{roomId, count}` | 라운지 채팅방에 **지금 접속 중인 사람 수**(같은 사람 여러 기기는 1명). 입장·퇴장·연결 끊김 때 방 전체에 전송 (#11) |
 | S→C | `match:request` / `match:accepted` | `{matchId, ...}` | 매칭 (#13) |
-| S→C | `guest:warning` | `{remainingSec: 300}` | 만료 5분 전 (#12) |
+| S→C | `guest:warning` | `{remainingSec}` | 만료 5분 전 1회, 연결 시 이미 5분 이하면 바로 (#12) |
 | S→C | `signup:nudge` | `{reason}` | 메시지 수 기준 가입 유도 (#14) |
 
 ## 6. 매칭 알고리즘 (#13)

@@ -10,18 +10,21 @@ const ACK_TIMEOUT_MS = 5000;
 const RETRY_MS = 3000;
 let socket = null;
 
-// 회원은 JWT, Guest는 guestToken으로 연결. 세션이 끝나면(guest:expired, 인증 거절) onSessionExpired 호출
-export async function connectSocket({ onSessionExpired } = {}) {
+// 회원은 JWT, Guest는 guestToken으로 연결
+// 세션이 끝나면 onSessionExpired('guest' | 'member'), Guest 만료 5분 전이면 onGuestWarning({ remainingSec })
+export async function connectSocket({ onSessionExpired, onGuestWarning } = {}) {
   disconnectSocket();
   const token = await secureStorage.get('token');
   const guestToken = token ? null : await secureStorage.get('guestToken');
   if (!token && !guestToken) return null;
 
   const s = io(config.SOCKET_URL, { auth: token ? { token } : { guestToken }, transports: ['websocket'] });
-  s.on('guest:expired', () => onSessionExpired?.());
+  s.on('guest:expired', () => onSessionExpired?.('guest'));
+  s.on('guest:warning', (w) => onGuestWarning?.(w));
   s.on('connect_error', (err) => {
     const code = err.data?.code;
-    if (code === 'UNAUTHORIZED' || code === 'GUEST_EXPIRED') return onSessionExpired?.();
+    if (code === 'GUEST_EXPIRED') return onSessionExpired?.('guest');
+    if (code === 'UNAUTHORIZED') return onSessionExpired?.('member');
     // 서버 미들웨어가 거절하면 자동 재연결이 멈추므로 잠시 뒤 직접 다시 시도
     if (code) setTimeout(() => socket === s && s.connect(), RETRY_MS);
   });

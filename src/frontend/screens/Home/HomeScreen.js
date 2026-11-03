@@ -5,6 +5,7 @@ import { api } from '../../services/api';
 import Avatar from '../../components/Avatar';
 import OrbitVisualization from '../../components/OrbitVisualization';
 import TasteTags from '../../components/TasteTags';
+import GuestTimer from '../../components/GuestTimer';
 import { colors, spacing, radius, typography } from '../../theme';
 
 // Home(궤도 대시보드) — PRD §4-3
@@ -109,12 +110,7 @@ export default function HomeScreen() {
         <View style={styles.headerText}>
           <Text style={styles.greeting}>{greeting(new Date().getHours())}</Text>
           <Text style={styles.nickname} numberOfLines={1}>{me.nickname}</Text>
-          {/* Guest 남은 시간 카운트다운(GuestTimer)은 #12. 지금은 종료 시각만 표시 */}
-          {me.type === 'guest' && (
-            <Text style={styles.guestBadge}>
-              둘러보기 중 · {new Date(me.expires_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}까지
-            </Text>
-          )}
+          {me.type === 'guest' && <GuestTimer expiresAt={me.expires_at} style={styles.guestTimer} />}
         </View>
         <Avatar emoji={me.avatar_emoji} size={48} />
       </View>
@@ -205,7 +201,7 @@ const styles = StyleSheet.create({
   headerText: { flex: 1, marginRight: spacing.md },
   greeting: { ...typography.caption, color: colors.textMuted, letterSpacing: 1 },
   nickname: { ...typography.title, color: colors.text },
-  guestBadge: { ...typography.caption, color: colors.primary, marginTop: spacing.xs },
+  guestTimer: { marginTop: spacing.xs },
 
   section: {
     backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.md,
