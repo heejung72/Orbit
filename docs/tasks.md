@@ -20,12 +20,12 @@
 | 9 | [FEAT] 하단 탭 네비게이션 | - | - | 닫음 (탭 구조는 #2, 디자인은 #24, Guest My Orbit은 #17) |
 | 10 | [FEAT] Socket.io 실시간 채팅 기반 | `feat/#10-socket-chat` | 4, 5 | ✅ |
 | 11 | [FEAT] 취향 라운지 | `feat/#11-lounge` | 10 | ✅ |
-| 12 | [FEAT] Guest Time Attack | `feat/#12-guest-time-attack` | 5, 10 | 🟨 |
+| 12 | [FEAT] Guest Time Attack | `feat/#12-guest-time-attack` | 5, 10 | 🟨 PR |
 | 13 | [FEAT] 1:1 취향 매칭 | `feat/#13-matching` | 7, 10 | ⬜ |
 | 14 | [FEAT] Guest → 회원 전환 | `feat/#14-guest-upgrade` | 12, 13 | ⬜ |
 | 15 | [FEAT] 오늘의 질문 | `feat/#15-today-question` | 8, 13 | ⬜ |
 | 16 | [FEAT] 신고·차단, 비속어 필터·스팸 Rate Limit | `feat/#16-safety` | 10 | ⬜ |
-| 17 | [FEAT] My Orbit | `feat/#17-my-orbit` | 7, 9 | ⬜ |
+| 17 | [FEAT] My Orbit | `feat/#17-my-orbit` | 7, 9 | 🟨 (#12 위에서 진행) |
 
 **권장 진행 순서:** 1 → 2 → 3 → **5 → 4** → 6 → **7 → 8** → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17
 
@@ -275,10 +275,13 @@
 - [ ] 메시지 길게 누르기 → 신고/차단 시트, Report 화면
 
 ## #17 [FEAT] My Orbit
-- [ ] 내 캐릭터·닉네임 표시 및 변경 (`PATCH /users/me`)
-- [ ] 취향 관리 (TasteSelect 재사용)
-- [ ] 계정 설정: 로그아웃, 탈퇴
-- [ ] Guest: 남은 시간 + 가입 유도 카드
+- [x] backend: `GET /users/me` 응답 정리(id·옛 취향 필드 제거), `PATCH /users/me`(닉네임 trim 2~12자, `avatar_id` 검증) — `PUT` 삭제
+- [x] backend: `DELETE /users/me` 비밀번호 확인 → 1:1 방 종료 + 계정 삭제(한 트랜잭션) → 소켓 연결 해제
+- [x] backend: `tests/users.e2e.js` 7개 (`npm run test:users`)
+- [x] 회원: 캐릭터·닉네임 표시 및 변경, 취향 요약 + 취향 편집(TasteSelect 재사용), 로그인 이메일, 로그아웃, 회원 탈퇴(비밀번호 확인, 화면 안 오류)
+- [x] Guest: My Orbit 탭 표시, 남은 시간(GuestTimer), 취향 편집, 둘러보기 끝내기(`DELETE /guest/session`)
+- [x] `_legacy/components`(RadarChart, VennDiagram) 삭제
+- 하지 않은 것: Guest 가입 버튼·데이터 이전 → #14 / 캐릭터 꾸미기 → V2 / 비밀번호 변경·찾기 → MVP 밖 / 차단 목록 → #16 / 우주 테마 → #24
 
 ---
 

@@ -3,10 +3,10 @@
 > **작업을 다시 시작할 때 이 파일부터 읽는다.** 작업이 끝날 때마다 갱신한다.
 
 ## 🔖 지금 상태
-- **현재 이슈:** #12 [FEAT] Guest Time Attack — `feat/#12-guest-time-attack`
-- **상태:** 구현·셀프 리뷰 완료 → PR 리뷰
-- **다음 할 일:** #12 머지 → #13 1:1 취향 매칭 → #14 Guest → 회원 전환 (우주 테마 `style/#24-space-theme`는 기능 이슈 뒤로 보류)
-- **로컬 준비물:** PostgreSQL + Redis, `src/backend`에서 `npm install`(socket.io-client 추가됨), 테스트는 `npm run test:auth`, `test:guest`, `test:tastes`, `test:home`, `test:chat`, `test:lounges`, `test:guest-expiry` (서버 실행 중, `GUEST_CLEANUP_INTERVAL_MS`를 줄이면 빨리 끝남)
+- **현재 이슈:** #17 [FEAT] My Orbit — `feat/#17-my-orbit` (#12 브랜치 위에서 진행)
+- **상태:** 구현·셀프 리뷰 완료 → #12(PR #29) 머지 후 PR
+- **다음 할 일:** #12 머지 → #17 PR → #13 1:1 취향 매칭 → #14 Guest → 회원 전환 (우주 테마 `style/#24-space-theme`는 기능 이슈 뒤로 보류)
+- **로컬 준비물:** PostgreSQL + Redis, `src/backend`에서 `npm install`(socket.io-client 추가됨), 테스트는 `npm run test:auth`, `test:guest`, `test:tastes`, `test:home`, `test:chat`, `test:lounges`, `test:guest-expiry`, `test:users` (서버 실행 중, `GUEST_CLEANUP_INTERVAL_MS`를 줄이면 빨리 끝남)
 
 ## ✅ 완료한 이슈
 | # | 제목 | PR | 머지일 |
@@ -86,6 +86,11 @@
 | 2026-11-03 | 라운지 Guest 메시지 정리는 LREM(값 단위 삭제) | 리스트를 다시 쓰면 그사이 들어온 메시지를 잃을 수 있음 |
 | 2026-11-03 | Guest 만료 감지 5경로(소켓·HTTP·만료 시각 타이머·앱 복귀·앱 재실행)를 `endSession('guest')` 하나로 | 어느 경로든 "궤도가 사라졌어요" 화면 |
 | 2026-11-03 | 테마에 `colors.danger` 추가 | 남은 시간 강조. 우주 테마(#24)에도 같은 이름 토큰 있음 |
+| 2026-11-03 | #17을 #12 머지 전에 #12 브랜치 위에서 시작 | GuestTimer·`endSession` 재사용. PR은 #12 머지 후 |
+| 2026-11-03 | 프로필 수정은 **`PATCH /users/me`**(바뀐 필드만), `PUT` 삭제 | 부분 수정이 자연스러움 |
+| 2026-11-03 | 탈퇴는 **비밀번호 재확인**, 1:1 방 종료 + 삭제를 한 트랜잭션, 메시지는 "떠난 궤도"로 남김 | 상대 대화 기록 보존, 오조작 방지 |
+| 2026-11-03 | Guest에게도 My Orbit 탭 표시 (남은 시간·취향 편집·둘러보기 끝내기) | #9 닫으면서 #17로 넘김. 가입 버튼은 #14 |
+| 2026-11-03 | `_legacy/components`(RadarChart·VennDiagram) 삭제 | #8·#17 재작성으로 쓰는 곳 없음 |
 | 2026-11-02 | 태그별 이미지(앨범 커버 등)는 #7에서 제외 → 별도 이슈 | 공식 API URL + 출처 표시 방식으로 추후 |
 
 ## ❓ 미결정 사항

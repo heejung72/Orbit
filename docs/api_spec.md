@@ -32,10 +32,14 @@
 | DELETE | `/guest/session` | G | 직접 종료 |
 
 ## Users / My Orbit — #17
+- 모두 회원 전용(`memberAuth`), Guest는 403 `MEMBER_ONLY`. 이전 `PUT /users/me`는 삭제
+- 탈퇴한 회원의 메시지는 `sender_id = NULL`로 남고 상대 화면에는 "떠난 궤도"로 표시
+
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
-| PATCH | `/users/me` | M | 닉네임, 캐릭터 변경 |
-| DELETE | `/users/me` | M | 탈퇴 |
+| GET | `/users/me` | M | `{email, nickname, avatar_id, avatar_emoji, created_at}` (user id·취향은 내려주지 않음, 취향은 `GET /tastes/me`) |
+| PATCH | `/users/me` | M | body `{nickname?, avatar_id?}` → `GET /users/me`와 같은 형식. 빈 body·닉네임(trim 후 2~12자)·없는 캐릭터는 400 |
+| DELETE | `/users/me` | M | body `{password}` → `{message}`. 비밀번호 없음 400, 틀림 401 `WRONG_PASSWORD`. 한 트랜잭션에서 참여 중인 1:1 방 종료(`closed_at`) 후 계정 삭제, 커밋 뒤 내 소켓 연결 해제 |
 | GET | `/public/avatars` | - | 기본 캐릭터 목록 `[{id, name, emoji, color}]` |
 
 ## Tastes — #7
