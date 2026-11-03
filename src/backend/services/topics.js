@@ -41,10 +41,17 @@ async function topicsFor(memberKeys) {
 }
 
 // 방 참여자 actorKey (PG 방은 chat_members, Redis 방은 room.members)
+// 상대가 나갔거나 탈퇴한 방은 공통 취향 대신 일반 질문
 async function topicsForRoom(room) {
-  if (room.store === 'redis') return topicsFor(room.members.map((m) => m.key));
-  const { rows } = await db.query('SELECT user_id FROM chat_members WHERE room_id = $1 ORDER BY joined_at', [room.id]);
-  if (rows.length < 2) return GENERAL.slice(0, 2); // 상대가 탈퇴한 방
+  if (room.store === 'redis') {
+    if (room.left.size > 0) return GENERAL.slice(0, 2);
+    return topicsFor(room.members.map((m) => m.key));
+  }
+  const { rows } = await db.query(
+    'SELECT user_id FROM chat_members WHERE room_id = $1 AND left_at IS NULL ORDER BY joined_at',
+    [room.id]
+  );
+  if (rows.length < 2) return GENERAL.slice(0, 2);
   return topicsFor(rows.map((r) => `member:${r.user_id}`));
 }
 

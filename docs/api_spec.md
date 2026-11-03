@@ -5,7 +5,7 @@
 > - 인증: `M` = memberAuth, `G` = guestAuth, `O` = optionalAuth(회원·Guest), `-` = 없음
 > - 에러 형식: `{ "error": "사용자에게 보여줄 메시지", "code": "GUEST_EXPIRED" }` (`code`는 클라이언트가 분기해야 할 때만)
 > - Guest 인증 헤더: `X-Guest-Token: <guestToken>` (회원은 `Authorization: Bearer <JWT>`, 둘 다 있으면 회원 우선)
-> - ⚠️ #3 시점 실제 구현은 이전 경로를 유지합니다 (`POST /matching/find`, `POST /matching/request/:targetId` 등). 각 기능 이슈에서 아래 명세로 교체합니다.
+> - 매칭 API는 #13에서 아래 명세로 교체했습니다 (이전 `/matching/find` 등 삭제). 아직 구현 전인 기능(#14~#16)의 상세는 각 이슈에서 채웁니다.
 
 ## 공통 에러 코드
 | code | HTTP | 설명 |
