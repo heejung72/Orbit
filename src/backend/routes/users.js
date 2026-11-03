@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
+const { leaveAllDirectRooms } = require('../services/directRooms');
 
 // /api/users — memberAuth 아래 (Guest는 403 MEMBER_ONLY). 실제 user id는 내려주지 않는다
 const router = express.Router();
@@ -51,7 +52,7 @@ router.patch('/me', async (req, res) => {
 
 // 탈퇴 — 비밀번호 확인 후 삭제
 // 취향·라운지·1:1 참여·매칭·차단은 FK CASCADE, 보낸 메시지는 sender_id가 NULL이 되어 "떠난 궤도"로 남는다
-// 참여 중이던 1:1 방은 상대만 남지 않도록 종료하고, 이 회원의 소켓 연결을 끊는다
+// 참여 중이던 1:1 방은 상대만 남지 않도록 종료하고(PG 방은 트랜잭션 안, Guest와의 Redis 방은 커밋 후 나가기), 이 회원의 소켓 연결을 끊는다
 router.delete('/me', async (req, res) => {
   const { password } = req.body || {};
   if (typeof password !== 'string' || !password) return res.status(400).json({ error: '비밀번호를 입력해주세요' });
@@ -83,7 +84,12 @@ router.delete('/me', async (req, res) => {
     client.release();
   }
 
-  // 삭제는 이미 커밋됨 — 소켓 정리가 실패해도 응답은 성공 (남은 소켓은 다음 이벤트에서 계정 없음으로 막힌다)
+  // 삭제는 이미 커밋됨 — 아래 정리가 실패해도 응답은 성공 (남은 소켓은 다음 이벤트에서 계정 없음으로 막힌다)
+  try {
+    await leaveAllDirectRooms(`member:${req.userId}`); // Redis 방은 참여 Guest 만료 시각에 어차피 사라짐
+  } catch (err) {
+    console.error('탈퇴 후 Redis 1:1 방 정리 실패:', err.message);
+  }
   try {
     for (const s of await req.app.get('io').fetchSockets()) {
       if (s.data.actor?.type === 'member' && s.data.actor.id === req.userId) s.disconnect(true);
