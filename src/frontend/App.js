@@ -9,6 +9,8 @@ import { secureStorage, clearSession } from './services/storage';
 import { api, setOnSessionExpired } from './services/api';
 import { connectSocket, disconnectSocket } from './services/socket';
 import GuestWarningBanner from './components/GuestWarningBanner';
+import MatchRequestBanner from './components/MatchRequestBanner';
+import { navigationRef, openChatRoom } from './navigation/navigationRef';
 import { colors, spacing, typography } from './theme';
 
 export default function App() {
@@ -18,12 +20,14 @@ export default function App() {
   const [guestExpiresAt, setGuestExpiresAt] = useState(null); // Guest 세션 만료 시각(ms)
   const [orbitExpired, setOrbitExpired] = useState(false); // true면 로그아웃 화면 첫 장이 "궤도가 사라졌어요"
   const [warning, setWarning] = useState(null); // 만료 5분 전 배너 { remainingSec }
+  const [matchRequest, setMatchRequest] = useState(null); // 받은 대화 요청 알림 (#13)
 
   // 세션 종료 공통. Guest 만료면 안내 화면, 회원 토큰 무효·로그아웃이면 Welcome
   // 경로: 소켓 guest:expired·인증 거절 / HTTP GUEST_EXPIRED·UNAUTHORIZED / 만료 시각 도달 / 앱 복귀 시 확인
   const endSession = useCallback(async (reason) => {
     await clearSession();
     setWarning(null);
+    setMatchRequest(null);
     setOrbitExpired(reason === 'guest');
     setAuthState('loggedOut');
   }, []);
@@ -72,9 +76,18 @@ export default function App() {
   }, []);
 
   // 로그인·둘러보기 중에만 실시간 소켓 연결. Guest 만료(guest:expired)·인증 거절이면 세션 정리 후 Welcome
+  // 대화 요청은 알림(사람 만나기 화면을 보고 있으면 화면이 직접 갱신), 수락되면 양쪽 모두 채팅방으로 (#13)
   useEffect(() => {
     if (authState === 'member' || authState === 'guest') {
-      connectSocket({ onSessionExpired: endSession, onGuestWarning: (w) => setWarning(w || {}) });
+      connectSocket({
+        onSessionExpired: endSession,
+        onGuestWarning: (w) => setWarning(w || {}),
+        onMatchRequest: (r) => navigationRef.getCurrentRoute()?.name !== 'Matching' && setMatchRequest(r),
+        onMatchAccepted: (a) => {
+          setMatchRequest(null);
+          openChatRoom(a);
+        },
+      });
     } else if (authState === 'loggedOut') {
       disconnectSocket();
     }
@@ -112,7 +125,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef}>
         <RootNavigator
           isLoggedIn={isLoggedIn}
           isGuest={isGuest}
@@ -124,6 +137,16 @@ export default function App() {
         />
       </NavigationContainer>
       {isGuest && warning && <GuestWarningBanner remainingSec={warning.remainingSec} onClose={() => setWarning(null)} />}
+      {isLoggedIn && matchRequest && (
+        <MatchRequestBanner
+          request={matchRequest}
+          onOpen={() => {
+            setMatchRequest(null);
+            if (navigationRef.isReady()) navigationRef.navigate('Matching');
+          }}
+          onClose={() => setMatchRequest(null)}
+        />
+      )}
     </SafeAreaProvider>
   );
 }

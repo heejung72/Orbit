@@ -4,9 +4,9 @@
 
 ## 🔖 지금 상태
 - **현재 이슈:** #17 [FEAT] My Orbit — `feat/#17-my-orbit`
-- **상태:** 구현·셀프 리뷰 완료 → PR 리뷰 (#13 1:1 취향 매칭 PR과 병행)
-- **다음 할 일:** #17·#13 머지 → #14 Guest → 회원 전환 → #15 → #16 (우주 테마 `style/#24-space-theme`는 기능 이슈 뒤로 보류)
-- **로컬 준비물:** PostgreSQL + Redis, `src/backend`에서 `npm install`(socket.io-client 추가됨), 테스트는 `npm run test:auth`, `test:guest`, `test:tastes`, `test:home`, `test:chat`, `test:lounges`, `test:guest-expiry`, `test:users` (서버 실행 중, `GUEST_CLEANUP_INTERVAL_MS`를 줄이면 빨리 끝남)
+- **상태:** 구현·셀프 리뷰 완료 → PR 리뷰 (#13은 PR #30으로 머지)
+- **다음 할 일:** #17 머지 → #13 리뷰 후속 수정 PR → #14 Guest → 회원 전환 → #15 → #16 (우주 테마 `style/#24-space-theme`는 기능 이슈 뒤로 보류)
+- **로컬 준비물:** PostgreSQL + Redis, `src/backend`에서 `npm install`(socket.io-client 추가됨), 테스트는 `npm run test:auth`, `test:guest`, `test:tastes`, `test:home`, `test:chat`, `test:lounges`, `test:guest-expiry`, `test:matching`, `test:users` (서버 실행 중, `GUEST_CLEANUP_INTERVAL_MS`를 줄이면 빨리 끝남)
 
 ## ✅ 완료한 이슈
 | # | 제목 | PR | 머지일 |
@@ -22,6 +22,7 @@
 | 10 | [FEAT] Socket.io 실시간 채팅 기반 | #27 | 2026-11-03 |
 | 11 | [FEAT] 취향 라운지 | #28 | 2026-11-03 |
 | 12 | [FEAT] Guest Time Attack | #29 | 2026-11-03 |
+| 13 | [FEAT] 1:1 취향 매칭 | #30 | 2026-11-03 |
 
 ## 📌 결정 로그
 | 날짜 | 결정 | 근거/비고 |
@@ -92,12 +93,21 @@
 | 2026-11-03 | 탈퇴는 **비밀번호 재확인**, 1:1 방 종료 + 삭제를 한 트랜잭션, 메시지는 "떠난 궤도"로 남김 | 상대 대화 기록 보존, 오조작 방지 |
 | 2026-11-03 | Guest에게도 My Orbit 탭 표시 (남은 시간·취향 편집·둘러보기 끝내기) | #9 닫으면서 #17로 넘김. 가입 버튼은 #14 |
 | 2026-11-03 | `_legacy/components`(RadarChart·VennDiagram) 삭제 | #8·#17 재작성으로 쓰는 곳 없음 |
+| 2026-11-03 | 매칭 API를 Guest에게도 열기 (`/api/matching` optionalAuth) | #13. PRD §3-2 Guest 1:1 허용 |
+| 2026-11-03 | 온라인 상태 = Redis `online:actors`(소켓 수), 후보는 접속 중인 사람만 | #13. 단일 서버 MVP, 서버 시작 시 비움 |
+| 2026-11-03 | 후보 응답은 실제 id 대신 `ref`(10분, 발급받은 사람만) | 익명성, 위조·재사용 방지 |
+| 2026-11-03 | Guest가 낀 1:1 방은 방·메시지(회원 메시지 포함) 모두 Redis, 참여 Guest 중 가장 이른 만료 시각에 사라짐 | Guest 데이터 PG 저장 금지 원칙. 가입 시 이전은 #14 |
+| 2026-11-03 | Guest가 낀 요청은 `match:pair` SET NX로 두 사람 사이 하나만, 수락·거절은 Lua 비교 후 변경 | 동시에 서로 요청·중복 수락 시 방 하나 |
+| 2026-11-03 | 회원 대기 요청은 24시간 지나면 만료, 거절 후 24시간 서로 추천 안 함 | 응답 없는 요청이 영원히 막지 않게 |
+| 2026-11-03 | 매칭 이벤트는 actor 전용 소켓 방(`actor:{key}`)으로 보냄 | 같은 사람의 모든 기기 |
+| 2026-11-03 | Guest 표시 정보 `guest:profile:{guestId}`를 세션과 따로 저장 | 세션 키는 토큰 해시라 guestId로 찾을 수 없음 |
+| 2026-11-03 | 대화 주제는 카테고리별 템플릿 문장, 공통 취향 없으면 일반 질문 | AI 생성 없이 MVP |
 | 2026-11-02 | 태그별 이미지(앨범 커버 등)는 #7에서 제외 → 별도 이슈 | 공식 API URL + 출처 표시 방식으로 추후 |
 
 ## ❓ 미결정 사항
 | 항목 | 결정 예정 이슈 |
 |---|---|
-| 매칭·신고 API를 Guest에게도 열기 (현재 `memberAuth`) | #13, #16 |
+| 신고 API를 Guest에게도 열기 (현재 `memberAuth`), Guest 차단 | #16 |
 | 상대도 Guest인 1:1 방을 가입 전환할 때 방·상대 메시지 처리 | #14 |
 | 컬러·폰트 디자인 토큰 | #24 (우주 테마) |
 
@@ -105,8 +115,7 @@
 - 기존 뼈대(TasteMate, 음식 취향 앱 기준)는 `main` 첫 커밋에 남아 있음 — 참고용
 - frontend 임시 아이콘(`assets/*.png`)은 #2에서 만든 placeholder — 정식 디자인은 #8
 - ⚠️ **#3 이후 로컬 DB는 초기화 필요**: `cd src/backend && npm run db:setup` (기존 TasteMate 테이블과 호환 안 됨)
-- 임시 API 형태(#3에서 유지): `POST /matching/find` 등은 #13에서 api_spec 형태로 교체 (`PUT /users/me/tastes`는 #7에서 `/tastes/me`로 교체 완료)
-- 메시지(REST·소켓)는 `is_mine`만 내려줌(실제 user_id 제거, PR #20). 매칭 후보 `id`는 아직 실제 user_id → #13에서 익명 참조로 교체
+- 메시지(REST·소켓)는 `is_mine`만 내려줌(실제 user_id 제거, PR #20). 매칭 후보는 `ref`, 요청은 `id`만 (#13)
 - 소켓 `message:send` Rate Limit 없음 → #16에서 Redis 기반으로 추가
-- Guest: Redis 30분 세션(#5), 소켓 연결·라운지 채팅·이벤트 시점 만료 확인(`guest:expired`)은 #10에서 구현. 소켓별 만료 타이머·5분 전 알림·카운트다운은 #12, Guest 1:1 방은 #13
+- Guest: Redis 30분 세션(#5), 소켓 연결·라운지 채팅·이벤트 시점 만료 확인(`guest:expired`)은 #10에서 구현. 소켓별 만료 타이머·5분 전 알림·카운트다운은 #12, Guest 1:1 방·매칭(Redis)은 #13
 - `src/backend/.env`는 git 제외됨. 새 환경에서는 `.env.example` 복사

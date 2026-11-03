@@ -3,6 +3,9 @@ const db = require('../db');
 const { getRedis } = require('../redis');
 const { guestTastesKey } = require('./tastes');
 const { removeGuestFromLounges } = require('./loungeMembers');
+const { guestProfileKey } = require('./actors');
+const { removeGuestRooms } = require('./directRooms');
+const { removeGuestMatches } = require('./matching');
 
 // Guest 세션 (docs/system_design.md §4)
 // - 토큰 원본은 클라이언트만 가진다. Redis에는 SHA-256 해시를 키로 저장 (Redis 유출 시 토큰 재사용 방지)
@@ -29,9 +32,18 @@ async function createGuestSession() {
   };
 
   const key = keyOf(token);
+  const profileKey = guestProfileKey(session.guestId);
   const fields = Object.fromEntries(Object.entries(session).map(([k, v]) => [k, String(v)]));
+  const { guestId, ...profile } = fields;
   // 저장과 만료 설정을 한 번에 (사이에 끊기면 만료 없는 키가 남음)
-  await getRedis().multi().hSet(key, fields).pExpireAt(key, expiresAt).exec();
+  // 표시 정보는 guestId로도 찾을 수 있게 따로 (매칭 후보·1:1 방, #13)
+  await getRedis()
+    .multi()
+    .hSet(key, fields)
+    .pExpireAt(key, expiresAt)
+    .hSet(profileKey, profile)
+    .pExpireAt(profileKey, expiresAt)
+    .exec();
   return { token, ...session };
 }
 
@@ -45,12 +57,16 @@ async function findGuestSession(token) {
   return { guestId: s.guestId, nickname: s.nickname, avatarId: Number(s.avatarId), avatarEmoji: s.avatarEmoji, expiresAt };
 }
 
-// 세션과 함께 Guest 임시 데이터(취향·라운지 참여)도 지운다. 시간 만료 시에는 같은 TTL·score로 함께 사라진다
+// 세션과 함께 Guest 임시 데이터(취향·라운지 참여·1:1 방·매칭 요청)도 지운다. 시간 만료 시에는 같은 TTL·score로 함께 사라진다
 async function deleteGuestSession(token) {
   const redis = getRedis();
   const guestId = await redis.hGet(keyOf(token), 'guestId');
-  if (guestId) await removeGuestFromLounges(guestId);
-  await redis.del(guestId ? [keyOf(token), guestTastesKey(guestId)] : [keyOf(token)]);
+  if (guestId) {
+    await removeGuestFromLounges(guestId);
+    await removeGuestRooms(guestId);
+    await removeGuestMatches(guestId);
+  }
+  await redis.del(guestId ? [keyOf(token), guestTastesKey(guestId), guestProfileKey(guestId)] : [keyOf(token)]);
 }
 
 module.exports = { createGuestSession, findGuestSession, deleteGuestSession };

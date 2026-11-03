@@ -50,11 +50,11 @@ const check = async (name, fn) => {
       assert.ok(m.j.expires_at && !('guestId' in m.j));
     });
 
-    await check('허용 범위: 라운지 읽기 200 / users·matching은 403 MEMBER_ONLY (chat은 #10, 라운지 참여는 #11부터 Guest 허용)', async () => {
+    await check('허용 범위: 라운지 읽기 200 / users는 403 MEMBER_ONLY (chat #10, 라운지 참여 #11, 매칭 #13부터 Guest 허용)', async () => {
       const list = await call('GET', '/lounges', null, G);
       assert.strictEqual(list.s, 200);
       assert.strictEqual((await call('GET', '/users/me', null, G)).j.code, 'MEMBER_ONLY');
-      assert.strictEqual((await call('GET', '/matching/my', null, G)).j.code, 'MEMBER_ONLY');
+      assert.strictEqual((await call('GET', '/matching/requests', null, G)).s, 200);
     });
 
     await check('위조 토큰 → 401 GUEST_EXPIRED', async () => {

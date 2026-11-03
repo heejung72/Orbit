@@ -7,7 +7,7 @@ import Avatar from '../../components/Avatar';
 import GuestTimer from '../../components/GuestTimer';
 import { colors, spacing, radius, typography } from '../../theme';
 
-// 채팅방 (1:1·라운지 공통): 기록 + 실시간 메시지, 입력 중 표시, 1:1 나가기
+// 채팅방 (1:1·라운지 공통): 기록 + 실시간 메시지, 입력 중 표시, 1:1 나가기, 1:1 대화 주제 카드(#13)
 // params: { roomId, title, type: 'direct' | 'lounge' }
 const TYPING_SEND_MS = 2000; // 입력 중 신호는 2초에 한 번만
 const TYPING_SHOW_MS = 3000;
@@ -23,6 +23,8 @@ export default function ChatRoomScreen({ route, navigation }) {
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [presence, setPresence] = useState(null); // 라운지: 지금 접속 중인 인원 (room:presence)
   const [guestExpiresAt, setGuestExpiresAt] = useState(null); // Guest면 상단에 남은 시간 표시
+  const [topics, setTopics] = useState([]); // 1:1: 공통 취향 대화 주제 (누르면 입력창에)
+  const [showTopics, setShowTopics] = useState(true);
   const listRef = useRef(null);
   const lastTypingSent = useRef(0);
   const typingTimer = useRef(null);
@@ -54,6 +56,16 @@ export default function ChatRoomScreen({ route, navigation }) {
         : undefined,
     });
   }, [navigation, title, type]);
+
+  // 대화 주제는 부가 정보라 실패해도 화면 오류로 띄우지 않는다
+  useEffect(() => {
+    if (type !== 'direct') return undefined;
+    let alive = true;
+    api.getTopics(roomId).then((r) => alive && setTopics(r.topics)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [roomId, type]);
 
   useEffect(() => {
     AsyncStorage.multiGet(['isGuest', 'guestExpiresAt'])
@@ -154,6 +166,21 @@ export default function ChatRoomScreen({ route, navigation }) {
           <GuestTimer expiresAt={guestExpiresAt} />
         </View>
       )}
+      {showTopics && topics.length > 0 && (
+        <View style={styles.topics}>
+          <View style={styles.topicsHeader}>
+            <Text style={styles.topicsTitle}>이런 이야기로 시작해 보세요</Text>
+            <Pressable onPress={() => setShowTopics(false)} accessibilityRole="button" accessibilityLabel="대화 주제 닫기" hitSlop={spacing.sm}>
+              <Text style={styles.topicsClose}>닫기</Text>
+            </Pressable>
+          </View>
+          {topics.map((t) => (
+            <Pressable key={t} onPress={() => setInput(t)} accessibilityRole="button" accessibilityHint="입력창에 넣기" style={styles.topic}>
+              <Text style={styles.topicText}>{t}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
       {type === 'lounge' && presence !== null && (
         <Text style={styles.presence} accessibilityLiveRegion="polite">지금 {presence}명이 대화 중</Text>
       )}
@@ -218,6 +245,12 @@ const styles = StyleSheet.create({
   textMine: { color: colors.onPrimary },
 
   typing: { ...typography.caption, color: colors.textMuted, paddingHorizontal: spacing.md },
+  topics: { padding: spacing.md, gap: spacing.xs, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
+  topicsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  topicsTitle: { ...typography.caption, color: colors.textMuted },
+  topicsClose: { ...typography.caption, color: colors.textMuted },
+  topic: { borderWidth: 1, borderColor: colors.primary, borderRadius: radius.lg, paddingVertical: spacing.xs, paddingHorizontal: spacing.md, alignSelf: 'flex-start' },
+  topicText: { ...typography.caption, color: colors.primary },
   guestBar: { alignItems: 'center', paddingVertical: spacing.xs, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
   presence: {
     ...typography.caption, color: colors.primary, textAlign: 'center', paddingVertical: spacing.xs,
