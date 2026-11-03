@@ -156,6 +156,10 @@ const check = async (name, fn) => {
       assert.ok(!(await candidates(A)).some((c) => c.nickname === Bm.name), '대화 중인 상대는 후보에서 제외');
       const topics = (await call('GET', `/chat/rooms/${roomId}/topics`, null, A.H)).j.topics;
       assert.ok(topics.length >= 1 && topics.length <= 3 && topics.some((t) => hobby.some((h) => t.includes(h.name))), JSON.stringify(topics));
+      // PG 방도 상대가 나가면 일반 질문
+      await db.query('UPDATE chat_members SET left_at = now() WHERE room_id = $1 AND user_id = $2', [roomId, Bm.userId]);
+      const after = (await call('GET', `/chat/rooms/${roomId}/topics`, null, A.H)).j.topics;
+      assert.ok(after.length === 2 && !after.some((t) => hobby.some((h) => t.includes(h.name))), JSON.stringify(after));
     });
 
     await check('동시에 서로 요청(회원끼리): 하나만 성공', async () => {
@@ -278,6 +282,10 @@ const check = async (name, fn) => {
       assert.strictEqual(pending.s, 201);
       assert.strictEqual((await call('DELETE', '/guest/session', undefined, G.H)).s, 200);
       assert.strictEqual((await call('DELETE', '/guest/session', undefined, G4.H)).s, 200);
+      // 채팅 목록을 열지 않아도 후보 계산 때 회원 목록 키에서 사라진 방이 정리됨
+      assert.ok(await redis.sIsMember(`actor:rooms:member:${A.userId}`, redisRoomId));
+      await candidates(A);
+      assert.ok(!(await redis.sIsMember(`actor:rooms:member:${A.userId}`, redisRoomId)));
       assert.strictEqual((await call('GET', `/chat/rooms/${redisRoomId}/messages`, null, A.H)).s, 404);
       assert.ok(!(await call('GET', '/chat/rooms', null, A.H)).j.direct.some((x) => x.id === redisRoomId));
       assert.ok(!(await call('GET', '/matching/requests', null, A.H)).j.sent.some((m) => m.id === pending.j.id));
@@ -294,6 +302,8 @@ const check = async (name, fn) => {
       assert.strictEqual((await call('POST', `/chat/rooms/${roomId}/leave`, {}, G5.H)).s, 200);
       assert.strictEqual((await call('GET', `/chat/rooms/${roomId}/messages`, null, G5.H)).s, 404);
       assert.strictEqual((await call('GET', `/chat/rooms/${roomId}/messages`, null, A.H)).s, 200);
+      const topics = (await call('GET', `/chat/rooms/${roomId}/topics`, null, A.H)).j.topics;
+      assert.ok(topics.length === 2 && !topics.some((t) => hobby.some((h) => t.includes(h.name))), '상대가 나간 방은 일반 질문');
       assert.strictEqual((await call('POST', `/chat/rooms/${roomId}/leave`, {}, A.H)).s, 200);
       assert.strictEqual(await redis.exists(`room:${roomId}`), 0);
     });
