@@ -56,8 +56,9 @@ router.patch('/me', async (req, res) => {
 router.delete('/me', async (req, res) => {
   const { password } = req.body || {};
   if (typeof password !== 'string' || !password) return res.status(400).json({ error: '비밀번호를 입력해주세요' });
-  const client = await db.pool.connect();
+  let client;
   try {
+    client = await db.pool.connect(); // 연결 실패도 아래 catch에서 500으로 (요청이 멈추지 않게)
     await client.query('BEGIN');
     const { rows } = await client.query('SELECT password_hash FROM users WHERE id = $1 FOR UPDATE', [req.userId]);
     if (rows.length === 0) {
@@ -77,11 +78,11 @@ router.delete('/me', async (req, res) => {
     await client.query('DELETE FROM users WHERE id = $1', [req.userId]);
     await client.query('COMMIT');
   } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
+    await client?.query('ROLLBACK').catch(() => {});
     console.error('DELETE /api/users/me 실패:', err.message);
     return res.status(500).json({ error: '서버 오류가 발생했습니다' });
   } finally {
-    client.release();
+    client?.release();
   }
 
   // 삭제는 이미 커밋됨 — 아래 정리가 실패해도 응답은 성공 (남은 소켓은 다음 이벤트에서 계정 없음으로 막힌다)

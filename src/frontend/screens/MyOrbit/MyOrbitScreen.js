@@ -219,7 +219,13 @@ export default function MyOrbitScreen({ navigation, isGuest, onLogout }) {
               />
               {deleteError ? <Text style={styles.error} accessibilityRole="alert">{deleteError}</Text> : null}
               <View style={styles.row}>
-                <Pressable style={[styles.button, styles.outline]} onPress={cancelDelete} accessibilityRole="button">
+                {/* 요청 중에 닫으면 결과(오류·성공)를 볼 곳이 없어지므로 응답이 올 때까지 막는다 */}
+                <Pressable
+                  style={[styles.button, styles.outline, busy && styles.disabled]}
+                  onPress={cancelDelete}
+                  disabled={busy}
+                  accessibilityRole="button"
+                >
                   <Text style={[styles.buttonText, styles.outlineText]}>취소</Text>
                 </Pressable>
                 <Pressable

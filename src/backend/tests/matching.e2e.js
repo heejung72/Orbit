@@ -320,6 +320,17 @@ const check = async (name, fn) => {
       assert.strictEqual((await call('GET', `/chat/rooms/${roomId}/messages`, null, G6.H)).s, 200, '남은 Guest는 기록을 볼 수 있음');
     });
 
+    await check('탈퇴 후 Redis 방 정리가 안 됐어도 남은 토큰으로는 그 방에 접근 불가', async () => {
+      const P = await member('정리실패');
+      const G7 = await guest();
+      await sleep(150);
+      const r = await request(P, G7);
+      const roomId = (await call('POST', `/matching/requests/${r.j.id}/accept`, {}, G7.H)).j.roomId;
+      await db.query('DELETE FROM users WHERE id = $1', [P.userId]); // 라우트를 거치지 않아 Redis 방에는 그대로 남은 상태
+      assert.strictEqual((await call('GET', `/chat/rooms/${roomId}/messages`, null, P.H)).s, 404);
+      assert.strictEqual((await emit(P.s, 'message:send', { roomId, content: '남은 토큰' })).code, 'ROOM_NOT_FOUND');
+    });
+
     await check('온라인 상태: 같은 사람 두 기기는 1명, 마지막 기기가 끊기면 제외', async () => {
       const M = await member('두기기');
       const tok = (await call('POST', '/auth/login', { email: `mt_두기기_${run}@orbit.test`, password: 'pw123456' })).j.token;

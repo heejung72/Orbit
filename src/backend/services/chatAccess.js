@@ -33,6 +33,11 @@ async function getRoomForActor(rawRoomId, actor) {
   }
   const key = actorKey(actor);
   if (!redisRoom || redisRoom.left.has(key) || !redisRoom.members.some((m) => m.key === key)) return null;
+  // JWT만으로는 탈퇴 여부를 모른다 — 탈퇴 후 방 정리가 실패해도 남은 토큰으로 Redis 방에 쓰지 못하게
+  if (actor.type === 'member') {
+    const { rowCount } = await db.query("SELECT 1 FROM users WHERE id = $1 AND status = 'active'", [actor.id]);
+    if (rowCount === 0) return null;
+  }
   return redisRoom;
 }
 
