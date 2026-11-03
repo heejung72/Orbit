@@ -35,15 +35,13 @@ export default function MainTabs({ isGuest, onLogout }) {
         component={ChatListScreen}
         options={{ title: '채팅', tabBarIcon: () => <Text>💬</Text> }}
       />
-      {/* Guest용 My Orbit(남은 시간 + 가입 유도)은 #17에서 추가 */}
-      {!isGuest ? (
-        <Tab.Screen
-          name="MyOrbit"
-          options={{ title: 'My Orbit', tabBarIcon: () => <Text>👤</Text> }}
-        >
-          {props => <MyOrbitScreen {...props} onLogout={onLogout} />}
-        </Tab.Screen>
-      ) : null}
+      {/* 회원: 프로필·취향·계정 / Guest: 캐릭터·남은 시간·취향·둘러보기 끝내기 (#17) */}
+      <Tab.Screen
+        name="MyOrbit"
+        options={{ title: 'My Orbit', tabBarIcon: () => <Text>👤</Text> }}
+      >
+        {props => <MyOrbitScreen {...props} isGuest={isGuest} onLogout={onLogout} />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 }
