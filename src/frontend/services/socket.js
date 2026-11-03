@@ -12,7 +12,8 @@ let socket = null;
 
 // 회원은 JWT, Guest는 guestToken으로 연결
 // 세션이 끝나면 onSessionExpired('guest' | 'member'), Guest 만료 5분 전이면 onGuestWarning({ remainingSec })
-export async function connectSocket({ onSessionExpired, onGuestWarning } = {}) {
+// 매칭(#13): 대화 요청을 받으면 onMatchRequest(request), 수락되면 onMatchAccepted({ matchId, roomId, title })
+export async function connectSocket({ onSessionExpired, onGuestWarning, onMatchRequest, onMatchAccepted } = {}) {
   disconnectSocket();
   const token = await secureStorage.get('token');
   const guestToken = token ? null : await secureStorage.get('guestToken');
@@ -21,6 +22,8 @@ export async function connectSocket({ onSessionExpired, onGuestWarning } = {}) {
   const s = io(config.SOCKET_URL, { auth: token ? { token } : { guestToken }, transports: ['websocket'] });
   s.on('guest:expired', () => onSessionExpired?.('guest'));
   s.on('guest:warning', (w) => onGuestWarning?.(w));
+  s.on('match:request', (r) => onMatchRequest?.(r));
+  s.on('match:accepted', (a) => onMatchAccepted?.(a));
   s.on('connect_error', (err) => {
     const code = err.data?.code;
     if (code === 'GUEST_EXPIRED') return onSessionExpired?.('guest');
