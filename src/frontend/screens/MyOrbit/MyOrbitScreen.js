@@ -38,6 +38,7 @@ export default function MyOrbitScreen({ navigation, isGuest, onLogout }) {
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [password, setPassword] = useState('');
+  const [deleteError, setDeleteError] = useState(''); // 탈퇴 입력창은 화면 맨 아래라 오류도 그 옆에 (위쪽 error는 스크롤 밖일 수 있음)
 
   // 취향 편집 등에서 돌아올 때마다 새로고침
   const load = useCallback(async () => {
@@ -77,14 +78,20 @@ export default function MyOrbitScreen({ navigation, isGuest, onLogout }) {
 
   const deleteAccount = async () => {
     setBusy(true);
-    setError('');
+    setDeleteError('');
     try {
       await api.deleteAccount(password);
       onLogout?.(); // 세션 정리 → Welcome
     } catch (err) {
-      setError(messageOf(err));
+      setDeleteError(messageOf(err));
       setBusy(false);
     }
+  };
+
+  const cancelDelete = () => {
+    setConfirmDelete(false);
+    setPassword('');
+    setDeleteError('');
   };
 
   const endBrowsing = async () => {
@@ -201,14 +208,18 @@ export default function MyOrbitScreen({ navigation, isGuest, onLogout }) {
               <TextInput
                 style={styles.input}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  setDeleteError('');
+                }}
                 secureTextEntry
                 placeholder="비밀번호 확인"
                 placeholderTextColor={colors.textMuted}
                 accessibilityLabel="비밀번호 확인"
               />
+              {deleteError ? <Text style={styles.error} accessibilityRole="alert">{deleteError}</Text> : null}
               <View style={styles.row}>
-                <Pressable style={[styles.button, styles.outline]} onPress={() => { setConfirmDelete(false); setPassword(''); }} accessibilityRole="button">
+                <Pressable style={[styles.button, styles.outline]} onPress={cancelDelete} accessibilityRole="button">
                   <Text style={[styles.buttonText, styles.outlineText]}>취소</Text>
                 </Pressable>
                 <Pressable
