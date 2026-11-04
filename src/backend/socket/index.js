@@ -5,6 +5,8 @@ const { toUuid } = require('../utils/validate');
 const { normalizeContent, saveMessage, toClient } = require('../services/chat');
 const { actorKey, actorRoom } = require('../services/actors');
 const { markOnline, markOffline } = require('../services/online');
+const { getRedis } = require('../redis');
+const { msgCountKey } = require('../services/guestUpgrade');
 
 // Socket.io — docs/system_design.md §5
 // C→S: room:join · room:leave · message:send · typing  /  S→C: message:new · typing · guest:expired · room:presence
@@ -12,9 +14,18 @@ const { markOnline, markOffline } = require('../services/online');
 // 결과·오류는 ack 콜백 { ok, code?, message? } 로 돌려준다
 // 메시지 본문은 어떤 로그에도 남기지 않는다 (오류 로그는 err.message만)
 // Guest: 만료 5분 전 guest:warning, 만료 시각 guest:expired (소켓 타이머) + 30초 정리 작업(jobs/guestExpiry.js)
+// 가입 유도(#14): Guest 메시지 20개째에 signup:nudge (5분 전 guest:warning과 함께 앱이 가입 유도 모달을 띄운다)
 // TODO(#16): message:send Rate Limit
 
 const WARNING_MS = (Number(process.env.GUEST_WARNING_MINUTES) || 5) * 60 * 1000;
+const NUDGE_AT = 20; // Guest가 보낸 메시지가 이 수가 되면 가입 유도 1회 (#14)
+
+// INCR 결과가 정확히 NUDGE_AT일 때만 보내므로 여러 기기·동시 전송에도 한 번
+async function countGuestMessage(io, actor) {
+  const key = msgCountKey(actor.id);
+  const [count] = await getRedis().multi().incr(key).pExpireAt(key, actor.expiresAt).exec();
+  if (Number(count) === NUDGE_AT) io.to(actorRoom(actorKey(actor))).emit('signup:nudge', { reason: 'messages' });
+}
 const authError = (code) => Object.assign(new Error(code), { data: { code } });
 const fail = (code, message) => ({ ok: false, code, message });
 const isExpiredGuest = (actor) => actor.type === 'guest' && !(actor.expiresAt > Date.now());
@@ -152,6 +163,7 @@ function setupSocket(io) {
         s.emit('message:new', toClient(message, s.data.actor));
       }
       reply({ ok: true, id: message.id });
+      if (actor.type === 'guest') countGuestMessage(io, actor).catch((err) => console.error('Guest 메시지 수 기록 실패:', err.message));
     }));
 
     socket.on('typing', handle(async ({ roomId }) => {

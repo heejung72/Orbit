@@ -3,10 +3,10 @@
 > **작업을 다시 시작할 때 이 파일부터 읽는다.** 작업이 끝날 때마다 갱신한다.
 
 ## 🔖 지금 상태
-- **현재 이슈:** #17 [FEAT] My Orbit — `feat/#17-my-orbit`
-- **상태:** 구현·셀프 리뷰 완료 → PR 리뷰 (#13은 PR #30으로 머지)
-- **다음 할 일:** #17 머지 → #13 리뷰 후속 수정 PR → #14 Guest → 회원 전환 → #15 → #16 (우주 테마 `style/#24-space-theme`는 기능 이슈 뒤로 보류)
-- **로컬 준비물:** PostgreSQL + Redis, `src/backend`에서 `npm install`(socket.io-client 추가됨), 테스트는 `npm run test:auth`, `test:guest`, `test:tastes`, `test:home`, `test:chat`, `test:lounges`, `test:guest-expiry`, `test:matching`, `test:users` (서버 실행 중, `GUEST_CLEANUP_INTERVAL_MS`를 줄이면 빨리 끝남)
+- **현재 이슈:** #14 [FEAT] Guest → 회원 전환 — `feat/#14-guest-upgrade`
+- **상태:** 구현·셀프 리뷰 완료 → PR 리뷰
+- **다음 할 일:** #14 머지 → #15 오늘의 질문 → #16 신고·차단 (우주 테마 `style/#24-space-theme`는 기능 이슈 뒤로 보류), `db.js` 풀 오류 처리 [FIX] 별도
+- **로컬 준비물:** PostgreSQL + Redis, `src/backend`에서 `npm install`(socket.io-client 추가됨), 테스트는 `npm run test:auth`, `test:guest`, `test:tastes`, `test:home`, `test:chat`, `test:lounges`, `test:guest-expiry`, `test:matching`, `test:users`, `test:upgrade` (서버 실행 중, 새 DB 열이 있어 `npm run migrate` 먼저; `GUEST_CLEANUP_INTERVAL_MS`를 줄이면 빨리 끝남)
 
 ## ✅ 완료한 이슈
 | # | 제목 | PR | 머지일 |
@@ -22,7 +22,8 @@
 | 10 | [FEAT] Socket.io 실시간 채팅 기반 | #27 | 2026-11-03 |
 | 11 | [FEAT] 취향 라운지 | #28 | 2026-11-03 |
 | 12 | [FEAT] Guest Time Attack | #29 | 2026-11-03 |
-| 13 | [FEAT] 1:1 취향 매칭 | #30 | 2026-11-03 |
+| 13 | [FEAT] 1:1 취향 매칭 | #30, #32 | 2026-11-03 |
+| 17 | [FEAT] My Orbit | #31 | 2026-11-03 |
 
 ## 📌 결정 로그
 | 날짜 | 결정 | 근거/비고 |
@@ -102,13 +103,22 @@
 | 2026-11-03 | 매칭 이벤트는 actor 전용 소켓 방(`actor:{key}`)으로 보냄 | 같은 사람의 모든 기기 |
 | 2026-11-03 | Guest 표시 정보 `guest:profile:{guestId}`를 세션과 따로 저장 | 세션 키는 토큰 해시라 guestId로 찾을 수 없음 |
 | 2026-11-03 | 대화 주제는 카테고리별 템플릿 문장, 공통 취향 없으면 일반 질문 | AI 생성 없이 MVP |
+| 2026-11-03 | 가입 전환은 `POST /auth/register` + `X-Guest-Token` 하나로, PG 쓰기는 회원 생성과 한 트랜잭션 | #14. 실패 시 Guest 그대로 → 다시 시도 |
+| 2026-11-03 | 회원과의 1:1 Redis 방은 **같은 roomId**로 PG에 옮김(메시지 전부, 순서·작성자 유지) | 열려 있던 채팅방·상대 목록이 그대로 이어지게 |
+| 2026-11-03 | Guest끼리 방은 Redis에 두고 참여자·작성자 키만 회원으로, 방 만료는 남은 Guest 시각 | 다른 Guest 메시지는 PG에 남기지 않는 원칙. "사라진 궤도" 표시 불필요 |
+| 2026-11-03 | 같은 토큰 동시 가입은 `guest:upgrade` SET NX 선점, 커밋 직후 세션 키부터 삭제 | 한 번만 이전 |
+| 2026-11-03 | `auth:upgrade` 소켓 이벤트 대신 회원 토큰으로 다시 연결, 화면 구독은 socket.js가 유지 | 서버·앱 코드가 단순 |
+| 2026-11-03 | 만료 5분 전 안내를 배너에서 가입 유도 모달로 | #14 이슈 트리거. 모달 "나중에"로 닫으면 계속 이용 |
+| 2026-11-03 | 대기 중인 매칭 요청은 이전하지 않음 | 가입 후 다시 매칭 |
+| 2026-11-04 | `users.upgraded_from_guest` UNIQUE(마이그레이션 002)로 같은 Guest의 이중 이전을 PG에서 막음 | PR #33 CodeRabbit. Redis 선점·토큰 삭제만으로는 정리 실패·선점 만료 시 뚫림. PG에 Guest 세션은 여전히 저장하지 않음 |
+| 2026-11-04 | Guest끼리 방에서 두 사람이 모두 가입해 Guest가 남지 않으면 그 방을 PG로 옮김 | PR #33 CodeRabbit. 동시 가입 시 회원끼리 방이 Redis에 남아 옛 Guest 시각에 사라지던 문제 |
+| 2026-11-04 | 가입 응답 `migrated`는 이전 없으면 `false` | 이슈 #14 명세 |
 | 2026-11-02 | 태그별 이미지(앨범 커버 등)는 #7에서 제외 → 별도 이슈 | 공식 API URL + 출처 표시 방식으로 추후 |
 
 ## ❓ 미결정 사항
 | 항목 | 결정 예정 이슈 |
 |---|---|
 | 신고 API를 Guest에게도 열기 (현재 `memberAuth`), Guest 차단 | #16 |
-| 상대도 Guest인 1:1 방을 가입 전환할 때 방·상대 메시지 처리 | #14 |
 | 컬러·폰트 디자인 토큰 | #24 (우주 테마) |
 
 ## 📝 작업 메모
