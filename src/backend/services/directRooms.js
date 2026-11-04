@@ -167,11 +167,15 @@ async function dropDirectRoom(room) {
 
 // Guest가 가입하면 Guest끼리 방은 Redis에 두고 참여자·작성자 키만 회원으로 바꾼다 (#14)
 // 상대 화면에서는 닉네임·캐릭터 그대로, Guest 배지만 빠진다. 방은 남은 Guest의 만료 시각에 사라진다
+// 방·메시지·두 사람의 방 목록 키를 한 번에 바꾸고(중간 실패로 회원이 방을 못 찾는 일이 없게), 남은 Guest 수를 돌려준다
+// (-1 = 방이 이미 없음). 두 Guest가 동시에 가입해 0이 되면 호출한 쪽이 방을 PG로 옮긴다
 const TRANSFER = `local raw = redis.call('HGET', KEYS[1], 'members')
-if not raw then return 0 end
+if not raw then return -1 end
 local members = cjson.decode(raw)
+local guests = 0
 for _, m in ipairs(members) do
   if m.key == ARGV[1] then m.key = ARGV[2]; m.isGuest = false end
+  if m.isGuest then guests = guests + 1 end
 end
 redis.call('HSET', KEYS[1], 'members', cjson.encode(members), 'expiresAt', ARGV[3])
 local list = redis.call('LRANGE', KEYS[2], 0, -1)
@@ -185,13 +189,17 @@ for i, v in ipairs(list) do
 end
 redis.call('PEXPIREAT', KEYS[1], ARGV[3])
 if redis.call('EXISTS', KEYS[2]) == 1 then redis.call('PEXPIREAT', KEYS[2], ARGV[3]) end
-return 1`;
+redis.call('SADD', KEYS[4], ARGV[4])
+redis.call('SREM', KEYS[3], ARGV[4])
+return guests`;
 
+// 목록 다시 쓰기와 새 메시지 추가가 섞이지 않게 Lua로 한 번에 → 남은 Guest 수
 async function transferDirectRoom(room, oldKey, newKey, expiresAt) {
-  const redis = getRedis();
-  // 목록 다시 쓰기와 새 메시지 추가가 섞이지 않게 한 번에 (Lua는 원자적으로 실행됨)
-  await redis.eval(TRANSFER, { keys: [roomKey(room.id), msgsKey(room.id)], arguments: [oldKey, newKey, String(expiresAt)] });
-  await redis.multi().sAdd(actorRoomsKey(newKey), room.id).sRem(actorRoomsKey(oldKey), room.id).exec();
+  const left = await getRedis().eval(TRANSFER, {
+    keys: [roomKey(room.id), msgsKey(room.id), actorRoomsKey(oldKey), actorRoomsKey(newKey)],
+    arguments: [oldKey, newKey, String(expiresAt), room.id],
+  });
+  return Number(left);
 }
 
 // Guest가 둘러보기를 직접 끝낼 때 그 Guest의 방을 바로 지운다 (시간 만료는 TTL)

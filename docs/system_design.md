@@ -138,10 +138,10 @@ sequenceDiagram
 **가입 유도:** 채팅방 "대화 저장하기", 만료 5분 전(`guest:warning`), 보낸 메시지 20개(`signup:nudge`) → 가입 유도 모달. "나중에"를 누르면 남은 시간 동안 계속 이용. My Orbit(Guest)에도 "가입하고 이어가기"
 **가입 화면:** 같은 RegisterScreen을 Guest 닉네임(12자 넘으면 잘라서)·캐릭터로 미리 채움(수정 가능), 요청에 `X-Guest-Token`이 함께 감
 
-1. `POST /api/auth/register` + `X-Guest-Token` → 세션이 유효하면 `guest:upgrade:{guestId}` 선점(SET NX, 실패 시 409 `UPGRADE_IN_PROGRESS`). 만료·위조 토큰이면 이전 없이 일반 가입
+1. `POST /api/auth/register` + `X-Guest-Token` → 세션이 유효하고 아직 옮기지 않은 Guest(`users.upgraded_from_guest`에 없음)면 `guest:upgrade:{guestId}` 선점(SET NX, 실패 시 409 `UPGRADE_IN_PROGRESS`). 만료·위조 토큰·이미 옮긴 Guest면 이전 없이 일반 가입(`migrated: false`)
 2. Redis에서 이전할 데이터를 먼저 읽는다 (트랜잭션 안에서 Redis를 기다리지 않게)
 3. **PG 한 트랜잭션** (`services/guestUpgrade.js`):
-   - users 생성
+   - users 생성 (`upgraded_from_guest` = guestId, UNIQUE — 선점이 만료되거나 커밋 후 정리가 실패해도 같은 Guest는 한 번만 옮겨짐)
    - `guest:tastes` → `user_tastes`
    - `guest:lounges` → `lounge_members` (이미 정원에 Guest로 포함된 자리라 정원 확인 없음)
    - 라운지 `room:{id}:guestmsgs`의 **본인 메시지만** → `messages` (같은 id·시각, sender = 새 userId)
@@ -150,7 +150,7 @@ sequenceDiagram
 4. **커밋 후 Redis 정리** (실패해도 가입은 성공, 남은 키는 세션 만료 시각에 TTL로 사라짐)
    - 세션 키부터 삭제 → 같은 토큰으로 다시 이전되지 않음
    - 옮긴 라운지 메시지 LREM, 옮긴 1:1 방 삭제
-   - **Guest끼리 방은 Redis에 그대로**: Lua 한 번에 참여자·메시지 작성자 키를 `member:{userId}`로, `is_guest=false`로 바꾸고 방 만료를 **남은 Guest의 만료 시각**으로
+   - **Guest끼리 방은 Redis에 그대로**: Lua 한 번에 참여자·메시지 작성자 키를 `member:{userId}`로, `is_guest=false`로 바꾸고 방 만료를 **남은 Guest의 만료 시각**으로, 두 사람의 방 목록 키도 같은 Lua에서 바꾼다. 두 Guest가 동시에 가입해 Guest가 남지 않으면 그 방은 PG로 옮긴다
    - 취향·표시 정보·라운지 참여·대기 중인 매칭 요청(옮기지 않음)·메시지 수 정리
    - 그 Guest의 소켓은 이벤트 없이 끊는다 (`guest:expired`를 보내면 앱이 만료 화면으로 감)
 5. 앱: 회원 토큰 저장(Guest 토큰 삭제) → `/auth/me` → 소켓을 회원 토큰으로 다시 연결(별도 `auth:upgrade` 이벤트 없음). 화면 구독은 소켓이 바뀌어도 유지되고, 채팅방에서 가입했으면 그 방으로 돌아간다

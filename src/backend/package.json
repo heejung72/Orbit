@@ -19,7 +19,7 @@
     "test:guest-expiry": "node tests/guestExpiry.e2e.js",
     "test:users": "node tests/users.e2e.js",
     "test:matching": "node tests/matching.e2e.js",
-    "test:guest-upgrade": "node tests/guestUpgrade.e2e.js"
+    "test:upgrade": "node tests/guestUpgrade.e2e.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

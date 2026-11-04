@@ -265,7 +265,7 @@
 - [x] `services/guestUpgrade.js`: 가입과 한 트랜잭션으로 취향·라운지 참여·본인 라운지 메시지·회원과의 1:1 방(같은 roomId, 메시지 순서·작성자 유지) 이전 ([system_design.md §4-4](./system_design.md))
 - [x] Guest끼리 방은 Redis에 두고 참여자·작성자 키만 회원으로 (Lua), 방 만료는 남은 Guest 시각으로
 - [x] `POST /auth/register` + `X-Guest-Token`: 선점(동시 가입 1번만), 실패 시 전체 롤백, 커밋 후 토큰 무효·Redis 정리·Guest 소켓 종료
-- [x] `tests/guestUpgrade.e2e.js` 10개 (`npm run test:guest-upgrade`)
+- [x] `tests/guestUpgrade.e2e.js` 13개 (`npm run test:upgrade`)
 - [x] `SignupNudgeModal` + 3가지 트리거(채팅방 "대화 저장하기" / 만료 5분 전 / 메시지 20개), My Orbit(Guest) "가입하고 이어가기" — 5분 전 배너(`GuestWarningBanner`)는 모달로 대체
 - [x] 가입 화면 미리 채움(닉네임·캐릭터), 화면 안 오류(Alert 제거), 가입 후 회원 세션·소켓 재연결, 채팅방으로 복귀
 - [x] 소켓 구독을 소켓 교체 후에도 유지, ChatRoom 입장 → 기록 순서로 바꿔 그사이 메시지 누락 방지

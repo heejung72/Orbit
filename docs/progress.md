@@ -6,7 +6,7 @@
 - **현재 이슈:** #14 [FEAT] Guest → 회원 전환 — `feat/#14-guest-upgrade`
 - **상태:** 구현·셀프 리뷰 완료 → PR 리뷰
 - **다음 할 일:** #14 머지 → #15 오늘의 질문 → #16 신고·차단 (우주 테마 `style/#24-space-theme`는 기능 이슈 뒤로 보류), `db.js` 풀 오류 처리 [FIX] 별도
-- **로컬 준비물:** PostgreSQL + Redis, `src/backend`에서 `npm install`(socket.io-client 추가됨), 테스트는 `npm run test:auth`, `test:guest`, `test:tastes`, `test:home`, `test:chat`, `test:lounges`, `test:guest-expiry`, `test:matching`, `test:users`, `test:guest-upgrade` (서버 실행 중, `GUEST_CLEANUP_INTERVAL_MS`를 줄이면 빨리 끝남)
+- **로컬 준비물:** PostgreSQL + Redis, `src/backend`에서 `npm install`(socket.io-client 추가됨), 테스트는 `npm run test:auth`, `test:guest`, `test:tastes`, `test:home`, `test:chat`, `test:lounges`, `test:guest-expiry`, `test:matching`, `test:users`, `test:upgrade` (서버 실행 중, 새 DB 열이 있어 `npm run migrate` 먼저; `GUEST_CLEANUP_INTERVAL_MS`를 줄이면 빨리 끝남)
 
 ## ✅ 완료한 이슈
 | # | 제목 | PR | 머지일 |
@@ -110,6 +110,9 @@
 | 2026-11-03 | `auth:upgrade` 소켓 이벤트 대신 회원 토큰으로 다시 연결, 화면 구독은 socket.js가 유지 | 서버·앱 코드가 단순 |
 | 2026-11-03 | 만료 5분 전 안내를 배너에서 가입 유도 모달로 | #14 이슈 트리거. 모달 "나중에"로 닫으면 계속 이용 |
 | 2026-11-03 | 대기 중인 매칭 요청은 이전하지 않음 | 가입 후 다시 매칭 |
+| 2026-11-04 | `users.upgraded_from_guest` UNIQUE(마이그레이션 002)로 같은 Guest의 이중 이전을 PG에서 막음 | PR #33 CodeRabbit. Redis 선점·토큰 삭제만으로는 정리 실패·선점 만료 시 뚫림. PG에 Guest 세션은 여전히 저장하지 않음 |
+| 2026-11-04 | Guest끼리 방에서 두 사람이 모두 가입해 Guest가 남지 않으면 그 방을 PG로 옮김 | PR #33 CodeRabbit. 동시 가입 시 회원끼리 방이 Redis에 남아 옛 Guest 시각에 사라지던 문제 |
+| 2026-11-04 | 가입 응답 `migrated`는 이전 없으면 `false` | 이슈 #14 명세 |
 | 2026-11-02 | 태그별 이미지(앨범 커버 등)는 #7에서 제외 → 별도 이슈 | 공식 API URL + 출처 표시 방식으로 추후 |
 
 ## ❓ 미결정 사항

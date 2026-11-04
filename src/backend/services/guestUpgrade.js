@@ -19,7 +19,13 @@ const msgCountKey = (guestId) => `guest:msgcount:${guestId}`;
 async function claimGuest(guestId) {
   return (await getRedis().set(claimKey(guestId), '1', { NX: true, PX: CLAIM_MS })) === 'OK';
 }
-const releaseGuest = (guestId) => getRedis().del(claimKey(guestId));
+// async: Redis가 끊겨 getRedis()가 바로 던져도 호출부의 .catch로 가게
+const releaseGuest = async (guestId) => getRedis().del(claimKey(guestId));
+
+// 이미 회원으로 옮긴 Guest인지 (PG에 남는 기록이라 Redis 정리가 실패했거나 선점이 만료돼도 두 번 옮기지 않는다)
+async function alreadyUpgraded(guestId) {
+  return (await db.query('SELECT 1 FROM users WHERE upgraded_from_guest = $1', [guestId])).rowCount > 0;
+}
 
 // 트랜잭션 전에 Redis에서 읽어 둔다 (트랜잭션 안에서 Redis를 기다리며 PG 연결을 잡고 있지 않게)
 async function collectGuestData(guest) {
@@ -57,6 +63,35 @@ async function collectGuestData(guest) {
   return { guestKey, tastes, loungeIds, loungeMessages, toPg, toTransfer };
 }
 
+const insertMessages = (client, rows) =>
+  rows.length
+    ? client.query(
+      `INSERT INTO messages (id, room_id, sender_id, content, created_at)
+       SELECT * FROM UNNEST($1::uuid[], $2::uuid[], $3::uuid[], $4::text[], $5::timestamptz[])
+       ON CONFLICT (id) DO NOTHING`,
+      [rows.map((r) => r.id), rows.map((r) => r.roomId), rows.map((r) => r.senderId), rows.map((r) => r.content), rows.map((r) => r.createdAt)]
+    )
+    : null;
+
+// Redis 1:1 방 → 같은 roomId로 PG 방 + 방 단위 표시 이름·캐릭터(상대 화면에서 그대로 보이게) + 메시지 순서·작성자 유지
+// userIdOf: 방 참여자 actorKey → users.id
+async function insertRoom(client, room, messages, userIdOf) {
+  await client.query(`INSERT INTO chat_rooms (id, type, created_at) VALUES ($1, 'direct', $2) ON CONFLICT (id) DO NOTHING`, [room.id, room.created_at]);
+  for (const m of room.members) {
+    await client.query(
+      `INSERT INTO chat_members (room_id, user_id, display_name, avatar_id, joined_at, left_at)
+       VALUES ($1, $2, $3, COALESCE($4, (SELECT id FROM avatars WHERE emoji = $5 LIMIT 1), 1), $6, $7)
+       ON CONFLICT DO NOTHING`,
+      [room.id, userIdOf(m.key), m.nickname, m.avatarId ?? null, m.avatarEmoji, room.created_at, room.left.has(m.key) ? new Date() : null]
+    );
+  }
+  await insertMessages(
+    client,
+    messages.map((msg) => ({ id: msg.id, roomId: room.id, senderId: userIdOf(msg.senderKey), content: msg.content, createdAt: msg.created_at }))
+  );
+}
+const memberIdOf = (key) => key.slice('member:'.length);
+
 // 회원 생성 트랜잭션 안에서 PG 쓰기 (client = 트랜잭션 클라이언트)
 async function writeToPg(client, userId, data) {
   const { guestKey, tastes, loungeIds, loungeMessages, toPg } = data;
@@ -76,39 +111,32 @@ async function writeToPg(client, userId, data) {
       [userId, loungeIds]
     );
   }
-  const insertMessages = (rows) =>
-    rows.length
-      ? client.query(
-        `INSERT INTO messages (id, room_id, sender_id, content, created_at)
-         SELECT * FROM UNNEST($1::uuid[], $2::uuid[], $3::uuid[], $4::text[], $5::timestamptz[])
-         ON CONFLICT (id) DO NOTHING`,
-        [rows.map((r) => r.id), rows.map((r) => r.roomId), rows.map((r) => r.senderId), rows.map((r) => r.content), rows.map((r) => r.createdAt)]
-      )
-      : null;
-
-  await insertMessages(loungeMessages.map(({ roomId, msg }) => ({ id: msg.id, roomId, senderId: userId, content: msg.content, createdAt: msg.created_at })));
-
-  // 회원과의 1:1 방 → 같은 roomId로 PG 방 + 방 단위 표시 이름·캐릭터(상대 화면에서 그대로 보이게) + 메시지 순서·작성자 유지
+  await insertMessages(
+    client,
+    loungeMessages.map(({ roomId, msg }) => ({ id: msg.id, roomId, senderId: userId, content: msg.content, createdAt: msg.created_at }))
+  );
   for (const { room, messages } of toPg) {
-    await client.query(`INSERT INTO chat_rooms (id, type, created_at) VALUES ($1, 'direct', $2)`, [room.id, room.created_at]);
-    for (const m of room.members) {
-      const id = m.key === guestKey ? userId : m.key.slice('member:'.length);
-      await client.query(
-        `INSERT INTO chat_members (room_id, user_id, display_name, avatar_id, joined_at, left_at)
-         VALUES ($1, $2, $3, COALESCE($4, (SELECT id FROM avatars WHERE emoji = $5 LIMIT 1), 1), $6, $7)`,
-        [room.id, id, m.nickname, m.avatarId ?? null, m.avatarEmoji, room.created_at, room.left.has(m.key) ? new Date() : null]
-      );
-    }
-    await insertMessages(
-      messages.map((msg) => ({
-        id: msg.id,
-        roomId: room.id,
-        senderId: msg.senderKey === guestKey ? userId : msg.senderKey.slice('member:'.length),
-        content: msg.content,
-        createdAt: msg.created_at,
-      }))
-    );
+    await insertRoom(client, room, messages, (key) => (key === guestKey ? userId : memberIdOf(key)));
   }
+}
+
+// 두 Guest가 동시에 가입해 Redis 방에 Guest가 남지 않게 된 경우 → 회원끼리 방이므로 PG로 옮긴다
+async function moveRoomToPg(roomId) {
+  const room = await directRooms.getDirectRoom(roomId);
+  if (!room || room.members.some((m) => m.isGuest)) return;
+  const messages = await directRooms.readDirectMessages(room, { limit: 1000 });
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    await insertRoom(client, room, messages, memberIdOf);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+  await directRooms.dropDirectRoom(room);
 }
 
 // 커밋 후 Redis 정리 — 실패해도 회원 가입은 성공 (Guest 키는 세션 만료 시각에 TTL로 사라짐)
@@ -120,7 +148,10 @@ async function cleanupRedis(token, userId, guestId, data) {
   for (const { raw, roomId } of data.loungeMessages) multi.lRem(guestMessagesKey(roomId), 0, raw); // PG로 옮긴 메시지가 두 번 보이지 않게
   await multi.exec();
   for (const { room } of data.toPg) await directRooms.dropDirectRoom(room);
-  for (const { room, expiresAt } of data.toTransfer) await directRooms.transferDirectRoom(room, data.guestKey, `member:${userId}`, expiresAt);
+  for (const { room, expiresAt } of data.toTransfer) {
+    const guestsLeft = await directRooms.transferDirectRoom(room, data.guestKey, `member:${userId}`, expiresAt);
+    if (guestsLeft === 0) await moveRoomToPg(room.id);
+  }
   // 남은 것(취향·표시 정보·라운지 참여·대기 중인 요청·옮기지 않은 방)은 둘러보기 종료와 같은 정리
   await removeGuestData(guestId);
   await redis.del([msgCountKey(guestId), claimKey(guestId)]);
@@ -133,4 +164,4 @@ const summary = (data) => ({
   direct_rooms: data.toPg.length + data.toTransfer.length,
 });
 
-module.exports = { claimGuest, releaseGuest, collectGuestData, writeToPg, cleanupRedis, summary, msgCountKey };
+module.exports = { claimGuest, releaseGuest, alreadyUpgraded, collectGuestData, writeToPg, cleanupRedis, summary, msgCountKey };

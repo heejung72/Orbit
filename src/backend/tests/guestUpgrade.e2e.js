@@ -1,5 +1,5 @@
 // Guest → 회원 전환 E2E 테스트 (#14)
-// 실행: 서버(npm run dev)와 Redis를 켠 상태에서 `npm run test:guest-upgrade` (DB 시드 필요: npm run db:setup)
+// 실행: 서버(npm run dev)와 Redis를 켠 상태에서 `npm run test:upgrade` (DB 시드 필요: npm run db:setup)
 require('dotenv').config();
 const crypto = require('crypto');
 const assert = require('assert');
@@ -166,7 +166,7 @@ const check = async (name, fn) => {
     await check('같은 Guest 토큰을 다시 쓰면 이전 없이 가입 (한 번만 이전)', async () => {
       const again = await register(G, `gu_again_${run}@orbit.test`);
       assert.strictEqual(again.s, 201);
-      assert.strictEqual(again.j.migrated, null);
+      assert.strictEqual(again.j.migrated, false);
       const otherId = jwt.decode(again.j.token).userId;
       assert.strictEqual((await db.query('SELECT count(*)::int AS n FROM user_tastes WHERE user_id = $1', [otherId])).rows[0].n, 0);
     });
@@ -178,7 +178,7 @@ const check = async (name, fn) => {
       const migrated = [a, b].filter((r) => r.s === 201 && r.j.migrated);
       assert.strictEqual(migrated.length, 1, JSON.stringify([a.s, a.j, b.s, b.j]));
       const other = migrated[0] === a ? b : a;
-      assert.ok(other.s === 409 ? other.j.code === 'UPGRADE_IN_PROGRESS' : other.j.migrated === null);
+      assert.ok(other.s === 409 ? other.j.code === 'UPGRADE_IN_PROGRESS' : other.j.migrated === false);
     });
 
     await check('이전 중 실패하면 회원 생성까지 되돌리고 Guest는 그대로 (다시 시도 가능)', async () => {
@@ -198,12 +198,60 @@ const check = async (name, fn) => {
     await check('만료·위조 토큰이면 이전 없이 가입, 이메일 중복은 409 (Guest 유지)', async () => {
       const fake = await call('POST', '/auth/register', { email: `gu_fake_${run}@orbit.test`, password: 'pw123456', nickname: '위조토큰' }, { 'X-Guest-Token': 'x'.repeat(43) });
       assert.strictEqual(fake.s, 201);
-      assert.strictEqual(fake.j.migrated, null);
+      assert.strictEqual(fake.j.migrated, false);
       const K = await guest();
       const dup = await register(K, `gu_new_${run}@orbit.test`);
       assert.strictEqual(dup.s, 409);
       assert.strictEqual((await call('GET', '/auth/me', null, K.H)).j.type, 'guest');
       assert.strictEqual(await redis.exists(`guest:upgrade:${K.guestId}`), 0, '실패하면 선점 해제');
+    });
+
+    await check('Guest 토큰이 있어도 없는 캐릭터는 400 (Guest 유지)', async () => {
+      const A = await guest();
+      const r = await call('POST', '/auth/register', { email: `gu_av_${run}@orbit.test`, password: 'pw123456', nickname: '캐릭터없음', avatar_id: 999999 }, A.H);
+      assert.strictEqual(r.s, 400);
+      assert.strictEqual((await call('GET', '/auth/me', null, A.H)).j.type, 'guest');
+      assert.strictEqual(await redis.exists(`guest:upgrade:${A.guestId}`), 0);
+    });
+
+    await check('이미 옮긴 Guest는 토큰이 남아 있어도 다시 옮기지 않음 (PG 기록이 최종 방어선)', async () => {
+      const X = await guest();
+      const first = await register(X, `gu_fence1_${run}@orbit.test`);
+      assert.ok(first.j.migrated);
+      // 커밋 후 Redis 정리가 실패해 세션이 남은 상황을 흉내 — 세션 키를 되살림
+      const expiresAt = Date.parse(X.expiresAt);
+      await redis.hSet(sessionKey(X.guestToken), { guestId: X.guestId, nickname: X.nickname, avatarId: String(X.avatarId), avatarEmoji: X.avatarEmoji, expiresAt: String(expiresAt) });
+      await redis.hSet(`guest:tastes:${X.guestId}`, String(tags[0].tagId), '3');
+      const second = await register(X, `gu_fence2_${run}@orbit.test`);
+      assert.strictEqual(second.s, 201);
+      assert.strictEqual(second.j.migrated, false);
+      const n = await db.query('SELECT count(*)::int AS n FROM users WHERE upgraded_from_guest = $1', [X.guestId]);
+      assert.strictEqual(n.rows[0].n, 1);
+    });
+
+    await check('Guest끼리 방: 두 사람 모두 가입하면 PG 방으로 (동시·차례대로 모두)', async () => {
+      for (const mode of ['concurrent', 'sequential']) {
+        const A = await guest();
+        const Bg = await guest();
+        await sleep(150);
+        const roomId = await match(A, Bg);
+        await say(A, roomId, `${mode} A`);
+        await say(Bg, roomId, `${mode} B`);
+        const [ra, rb] = mode === 'concurrent'
+          ? await Promise.all([register(A, `gu_${mode}_a_${run}@orbit.test`, '동시가입에이'), register(Bg, `gu_${mode}_b_${run}@orbit.test`, '동시가입비이')])
+          : [await register(A, `gu_${mode}_a_${run}@orbit.test`, '차례가입에이'), await register(Bg, `gu_${mode}_b_${run}@orbit.test`, '차례가입비이')];
+        assert.strictEqual(ra.s, 201);
+        assert.strictEqual(rb.s, 201);
+        const ids = [ra, rb].map((r) => jwt.decode(r.j.token).userId);
+        await sleep(200);
+        const members = (await db.query('SELECT user_id FROM chat_members WHERE room_id = $1', [roomId])).rows.map((r) => r.user_id);
+        assert.deepStrictEqual(members.sort(), [...ids].sort(), mode);
+        const msgs = (await db.query('SELECT sender_id, content FROM messages WHERE room_id = $1 ORDER BY created_at', [roomId])).rows;
+        assert.deepStrictEqual(msgs.map((r) => [r.sender_id, r.content]), [[ids[0], `${mode} A`], [ids[1], `${mode} B`]], mode);
+        assert.strictEqual(await redis.exists([`room:${roomId}`, `room:${roomId}:msgs`]), 0, mode);
+        const seen = (await call('GET', `/chat/rooms/${roomId}/messages`, null, { Authorization: 'Bearer ' + ra.j.token })).j;
+        assert.deepStrictEqual(seen.map((m) => [m.is_mine, m.is_guest]), [[true, false], [false, false]], mode);
+      }
     });
 
     await check('Guest 메시지 20개째에 signup:nudge 한 번', async () => {

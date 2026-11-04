@@ -46,6 +46,8 @@ router.post('/register', async (req, res) => {
   if (guestToken) {
     try {
       guest = await findGuestSession(guestToken);
+      // 이미 옮긴 Guest(정리 실패로 토큰이 남은 경우)는 이전 없이 일반 가입
+      if (guest && (await upgrade.alreadyUpgraded(guest.guestId))) guest = null;
       if (guest && !(await upgrade.claimGuest(guest.guestId))) {
         return res.status(409).json({ error: '이미 가입을 진행하고 있어요. 잠시 후 다시 확인해주세요', code: 'UPGRADE_IN_PROGRESS' });
       }
@@ -66,10 +68,10 @@ router.post('/register', async (req, res) => {
     client = await db.pool.connect();
     await client.query('BEGIN');
     const { rows } = await client.query(
-      `INSERT INTO users (email, password_hash, nickname, avatar_id)
-       VALUES ($1, $2, $3, COALESCE($4, 1))
+      `INSERT INTO users (email, password_hash, nickname, avatar_id, upgraded_from_guest)
+       VALUES ($1, $2, $3, COALESCE($4, 1), $5)
        RETURNING id, nickname, avatar_id`,
-      [email, passwordHash, nick, avatar_id ?? null]
+      [email, passwordHash, nick, avatar_id ?? null, data ? guest.guestId : null]
     );
     user = rows[0];
     if (data) await upgrade.writeToPg(client, user.id, data);
@@ -79,7 +81,12 @@ router.post('/register', async (req, res) => {
     if (guest) await upgrade.releaseGuest(guest.guestId).catch(() => {});
     // 중복 확인을 INSERT에 맡겨 동시 가입에도 409 하나만 성공
     if (err.code === '23505' && err.constraint === 'users_email_key') return res.status(409).json({ error: '이미 가입된 이메일입니다' });
-    if (err.code === '23503' && !data) return res.status(400).json({ error: '캐릭터를 다시 선택해주세요' });
+    // 같은 Guest를 두 번 옮기려 한 경우(선점이 만료된 뒤의 재시도 등) — PG 유니크 제약이 최종 방어선
+    if (err.code === '23505' && err.constraint === 'users_upgraded_from_guest_key') {
+      return res.status(409).json({ error: '이미 가입을 진행하고 있어요. 잠시 후 다시 확인해주세요', code: 'UPGRADE_IN_PROGRESS' });
+    }
+    // 없는 캐릭터(users FK)만 400. 이전 데이터의 FK 위반(지워진 태그 등)은 아래 500
+    if (err.code === '23503' && err.table === 'users') return res.status(400).json({ error: '캐릭터를 다시 선택해주세요' });
     if (err.code === 'REDIS_UNAVAILABLE') return res.status(503).json({ error: '잠시 후 다시 시도해주세요', code: 'UNAVAILABLE' });
     console.error('POST /api/auth/register 실패:', err.message);
     return res.status(500).json({ error: data ? '둘러본 기록을 옮기지 못했어요. 잠시 후 다시 시도해주세요' : '서버 오류가 발생했습니다' });
@@ -102,7 +109,7 @@ router.post('/register', async (req, res) => {
       console.error('가입 전환 후 소켓 정리 실패:', err.message);
     }
   }
-  res.status(201).json({ token: signToken(user.id), user: publicUser(user), migrated: data ? upgrade.summary(data) : null });
+  res.status(201).json({ token: signToken(user.id), user: publicUser(user), migrated: data ? upgrade.summary(data) : false });
 });
 
 // 로그인
