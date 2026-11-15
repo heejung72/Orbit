@@ -15,19 +15,22 @@ const CLAIM_MS = 60 * 1000;
 const claimKey = (guestId) => `guest:upgrade:${guestId}`;
 const msgCountKey = (guestId) => `guest:msgcount:${guestId}`;
 
-// 같은 Guest 토큰으로 동시에 가입하면 한 요청만 이전한다 (나머지는 409)
+/** 같은 Guest 토큰으로 동시에 가입하면 한 요청만 이전한다 (나머지는 409). @returns {Promise<boolean>} */
 async function claimGuest(guestId) {
   return (await getRedis().set(claimKey(guestId), '1', { NX: true, PX: CLAIM_MS })) === 'OK';
 }
 // async: Redis가 끊겨 getRedis()가 바로 던져도 호출부의 .catch로 가게
 const releaseGuest = async (guestId) => getRedis().del(claimKey(guestId));
 
-// 이미 회원으로 옮긴 Guest인지 (PG에 남는 기록이라 Redis 정리가 실패했거나 선점이 만료돼도 두 번 옮기지 않는다)
+/** 이미 회원으로 옮긴 Guest인지 확인. PG 기록이라 Redis 정리 실패·선점 만료와 무관하게 두 번 옮기지 않는다. */
 async function alreadyUpgraded(guestId) {
   return (await db.query('SELECT 1 FROM users WHERE upgraded_from_guest = $1', [guestId])).rowCount > 0;
 }
 
-// 트랜잭션 전에 Redis에서 읽어 둔다 (트랜잭션 안에서 Redis를 기다리며 PG 연결을 잡고 있지 않게)
+/**
+ * 트랜잭션 전에 Redis에서 이전할 데이터를 읽어 둔다.
+ * 트랜잭션 안에서 Redis를 기다리며 PG 연결을 잡고 있지 않게 하기 위함.
+ */
 async function collectGuestData(guest) {
   const redis = getRedis();
   const guestKey = `guest:${guest.guestId}`;
@@ -92,7 +95,7 @@ async function insertRoom(client, room, messages, userIdOf) {
 }
 const memberIdOf = (key) => key.slice('member:'.length);
 
-// 회원 생성 트랜잭션 안에서 PG 쓰기 (client = 트랜잭션 클라이언트)
+/** 회원 생성 트랜잭션 안에서 Guest 데이터를 PG에 쓴다. client는 호출부 트랜잭션 클라이언트. */
 async function writeToPg(client, userId, data) {
   const { guestKey, tastes, loungeIds, loungeMessages, toPg } = data;
   if (tastes.length) {
@@ -120,26 +123,42 @@ async function writeToPg(client, userId, data) {
   }
 }
 
-// 두 Guest가 동시에 가입해 Redis 방에 Guest가 남지 않게 된 경우 → 회원끼리 방이므로 PG로 옮긴다
+/**
+ * 두 Guest가 동시에 가입해 Redis 방에 Guest가 남지 않게 된 경우 → 회원끼리 방이므로 PG로 옮긴다.
+ * insertRoom은 ON CONFLICT DO NOTHING으로 멱등적이므로 재시도 안전.
+ * 최대 3회 시도 후 실패하면 false를 반환 (호출부에서 Redis 방을 유지해 TTL 전에 재시도 가능).
+ * @returns {Promise<boolean>} PG 저장 성공 여부
+ */
 async function moveRoomToPg(roomId) {
   const room = await directRooms.getDirectRoom(roomId);
-  if (!room || room.members.some((m) => m.isGuest)) return;
+  if (!room || room.members.some((m) => m.isGuest)) return true;
   const messages = await directRooms.readDirectMessages(room, { limit: 1000 });
-  const client = await db.pool.connect();
-  try {
-    await client.query('BEGIN');
-    await insertRoom(client, room, messages, memberIdOf);
-    await client.query('COMMIT');
-  } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
-    throw err;
-  } finally {
-    client.release();
+  const ATTEMPTS = 3;
+  for (let i = 0; i < ATTEMPTS; i++) {
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await insertRoom(client, room, messages, memberIdOf);
+      await client.query('COMMIT');
+      await directRooms.dropDirectRoom(room);
+      return true;
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      if (i === ATTEMPTS - 1) {
+        // shortcut: Redis 방을 보존하고 false 반환 — TTL 만료 전에 재시도 가능. 영구 큐는 V2.
+        console.error('[guestUpgrade] moveRoomToPg failed after retries, Redis room preserved:', roomId, err.message);
+        return false;
+      }
+    } finally {
+      client.release();
+    }
   }
-  await directRooms.dropDirectRoom(room);
 }
 
-// 커밋 후 Redis 정리 — 실패해도 회원 가입은 성공 (Guest 키는 세션 만료 시각에 TTL로 사라짐)
+/**
+ * 커밋 후 Redis 정리. 실패해도 회원 가입은 성공.
+ * Guest 키는 세션 만료 시각에 TTL로 사라지며, moveRoomToPg 실패 시 Redis 방은 TTL 전까지 보존된다.
+ */
 async function cleanupRedis(token, userId, guestId, data) {
   const redis = getRedis();
   // 토큰부터 무효로: 아래 정리가 중간에 실패해도 같은 토큰으로 다시 이전되지 않게
@@ -150,7 +169,7 @@ async function cleanupRedis(token, userId, guestId, data) {
   for (const { room } of data.toPg) await directRooms.dropDirectRoom(room);
   for (const { room, expiresAt } of data.toTransfer) {
     const guestsLeft = await directRooms.transferDirectRoom(room, data.guestKey, `member:${userId}`, expiresAt);
-    if (guestsLeft === 0) await moveRoomToPg(room.id);
+    if (guestsLeft === 0) await moveRoomToPg(room.id); // false면 Redis 방 보존, 로그 남김
   }
   // 남은 것(취향·표시 정보·라운지 참여·대기 중인 요청·옮기지 않은 방)은 둘러보기 종료와 같은 정리
   await removeGuestData(guestId);
