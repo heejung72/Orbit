@@ -125,23 +125,21 @@ async function writeToPg(client, userId, data) {
 
 /**
  * 두 Guest가 동시에 가입해 Redis 방에 Guest가 남지 않게 된 경우 → 회원끼리 방이므로 PG로 옮긴다.
- * insertRoom은 ON CONFLICT DO NOTHING으로 멱등적이므로 재시도 안전.
- * 최대 3회 시도 후 실패하면 false를 반환 (호출부에서 Redis 방을 유지해 TTL 전에 재시도 가능).
+ * 순서: ① 방+멤버 커밋(재시도 가능) → ② Lua로 메시지 목록 원자 읽기+삭제 → ③ 전체 메시지 ON CONFLICT DO NOTHING.
+ * ②에서 방 Hash가 사라지므로 이후 pushDirectMessage는 getDirectRoom에서 null을 받아 새 메시지를 쌓지 않는다.
  * @returns {Promise<boolean>} PG 저장 성공 여부
  */
 async function moveRoomToPg(roomId) {
   const room = await directRooms.getDirectRoom(roomId);
   if (!room || room.members.some((m) => m.isGuest)) return true;
-  const messages = await directRooms.readDirectMessages(room, { limit: 1000 });
   const ATTEMPTS = 3;
   for (let i = 0; i < ATTEMPTS; i++) {
     const client = await db.pool.connect();
     try {
       await client.query('BEGIN');
-      await insertRoom(client, room, messages, memberIdOf);
+      await insertRoom(client, room, [], memberIdOf); // 메시지는 drain 후 별도 저장
       await client.query('COMMIT');
-      await directRooms.dropDirectRoom(room);
-      return true;
+      break;
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {});
       if (i === ATTEMPTS - 1) {
@@ -153,6 +151,21 @@ async function moveRoomToPg(roomId) {
       client.release();
     }
   }
+  // 방+멤버 커밋 후 메시지 목록을 원자적으로 읽고 Redis에서 삭제.
+  // 커밋~drain 사이 도착한 메시지도 포함되며, drain 이후엔 새 메시지가 쌓이지 않는다.
+  const allMsgs = await directRooms.drainAndDropRoom(room);
+  if (allMsgs.length) {
+    const client = await db.pool.connect();
+    try {
+      await insertMessages(
+        client,
+        allMsgs.map((msg) => ({ id: msg.id, roomId: room.id, senderId: memberIdOf(msg.senderKey), content: msg.content, createdAt: msg.created_at }))
+      );
+    } finally {
+      client.release();
+    }
+  }
+  return true;
 }
 
 /**

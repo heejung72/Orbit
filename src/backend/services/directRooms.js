@@ -165,6 +165,24 @@ async function dropDirectRoom(room) {
   await multi.exec();
 }
 
+// 방 Hash와 메시지 List를 원자적으로 읽고 삭제한다 (Lua).
+// 이후 pushDirectMessage가 getDirectRoom을 먼저 호출하므로 삭제 후엔 새 메시지가 쌓이지 않는다.
+// 반환값: 파싱된 메시지 배열 (senderKey 포함)
+const DRAIN_SCRIPT = `
+local msgs = redis.call('LRANGE', KEYS[2], 0, -1)
+redis.call('DEL', KEYS[1], KEYS[2])
+return msgs`;
+async function drainAndDropRoom(room) {
+  const raws = await getRedis().eval(DRAIN_SCRIPT, {
+    keys: [roomKey(room.id), msgsKey(room.id)],
+    arguments: [],
+  });
+  const multi = getRedis().multi();
+  for (const m of room.members) multi.sRem(actorRoomsKey(m.key), room.id);
+  await multi.exec();
+  return raws.map((r) => JSON.parse(r));
+}
+
 // Guest가 가입하면 Guest끼리 방은 Redis에 두고 참여자·작성자 키만 회원으로 바꾼다 (#14)
 // 상대 화면에서는 닉네임·캐릭터 그대로, Guest 배지만 빠진다. 방은 남은 Guest의 만료 시각에 사라진다
 // 방·메시지·두 사람의 방 목록 키를 한 번에 바꾸고(중간 실패로 회원이 방을 못 찾는 일이 없게), 남은 Guest 수를 돌려준다
@@ -222,5 +240,6 @@ module.exports = {
   removeGuestRooms,
   getActorRooms,
   dropDirectRoom,
+  drainAndDropRoom,
   transferDirectRoom,
 };
