@@ -23,7 +23,7 @@
 | 12 | [FEAT] Guest Time Attack | `feat/#12-guest-time-attack` | 5, 10 | ✅ |
 | 13 | [FEAT] 1:1 취향 매칭 | `feat/#13-matching` | 7, 10 | ✅ |
 | 14 | [FEAT] Guest → 회원 전환 | `feat/#14-guest-upgrade` | 12, 13 | 🟨 PR |
-| 15 | [FEAT] 오늘의 질문 | `feat/#15-today-question` | 8, 13 | ⬜ |
+| 15 | [FEAT] 오늘의 질문 | `feat/#15-today-question` | 8, 13 | 🟦 |
 | 16 | [FEAT] 신고·차단, 비속어 필터·스팸 Rate Limit | `feat/#16-safety` | 10 | ⬜ |
 | 17 | [FEAT] My Orbit | `feat/#17-my-orbit` | 7, 9 | ✅ |
 
@@ -272,10 +272,14 @@
 - 하지 않은 것: 오늘의 질문 답변 이전 → #15 / 이메일 인증 → MVP 이후 / 소셜 로그인 → V2 / 대기 중인 매칭 요청 이전(가입 후 다시 매칭)
 
 ## #15 [FEAT] 오늘의 질문
-- [ ] seed 질문 순환 (publish_date 기준, 없으면 순번)
-- [ ] `GET /questions/today`, 답변 작성/조회, 답변자에게 대화 요청
-- [ ] Home 카드 + TodayQuestion 화면 (답변 → 다른 답변 리스트 → 대화 시작)
-- [ ] Guest 답변은 Redis
+- [x] seed 질문 순환 (publish_date 기준, 없으면 순번) — `services/questions.js` 기구현
+- [x] `services/matching.js`: `issueRef` helper 추출·export
+- [x] `services/questionAnswers.js`: `saveAnswer`, `getMyAnswer`, `listAnswers` (Guest = Redis, 회원 = PG)
+- [x] `GET /questions/today`, `POST /questions/:id/answers`, `GET /questions/:id/answers`, `POST /questions/:id/answers/:answerId/chat` — `routes/questions.js`
+- [x] TodayQuestion 화면 (답변 입력 → 내 답변 표시 → 다른 답변 목록 → 대화 시작)
+- [x] `api.js`: `getTodayQuestion`, `submitAnswer`, `getAnswers`, `chatWithAnswerer`
+- [x] `tests/questions.e2e.js` (`npm run test:questions`)
+- [x] `docs/api_spec.md` questions 섹션 상세 추가
 
 ## #16 [FEAT] 신고·차단, 비속어 필터·스팸 Rate Limit
 - [ ] `POST /reports` (메시지 스냅샷 저장), `POST/DELETE /blocks`

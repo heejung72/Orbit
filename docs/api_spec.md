@@ -110,10 +110,52 @@
 ## Today's Question — #15
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
-| GET | `/questions/today` | O | 오늘의 질문 + 내 답변 여부 |
+| GET | `/questions/today` | 선택 | 오늘의 질문 + 내 답변 여부 |
 | POST | `/questions/:id/answers` | O | 답변 작성 |
-| GET | `/questions/:id/answers` | O | 다른 사람 답변 (익명) |
+| GET | `/questions/:id/answers` | 선택 | 다른 사람 답변 (회원만, 익명) |
 | POST | `/questions/:id/answers/:answerId/chat` | O | 답변자에게 대화 요청 |
+
+### GET /questions/today
+응답:
+```json
+{
+  "question": { "id": 1, "content": "...(질문 내용)..." },
+  "my_answer": { "answer": "...", "created_at": "ISO" }
+}
+```
+- `question`: 오늘 KST 기준 질문 (없으면 `null`)
+- `my_answer`: 로그인 상태이고 답변했으면 채움, 아니면 `null`
+- Guest 답변은 Redis에만 저장 (목록에는 표시 안 됨)
+
+### POST /questions/:id/answers
+요청: `{ "answer": "내 답변 (1~300자)" }`
+응답: `201 { "id": "uuid" }`
+오류: `400 INVALID_ANSWER`, `404 NOT_FOUND`, `409 ALREADY_ANSWERED`
+
+### GET /questions/:id/answers
+쿼리: `limit` (1~50, 기본 20), `before` (created_at ISO, 커서 페이지네이션)
+응답:
+```json
+{
+  "answers": [
+    {
+      "id": "uuid",
+      "answer": "...",
+      "created_at": "ISO",
+      "nickname": "...",
+      "avatar_emoji": "🌙",
+      "ref": "base64url (로그인 시에만)"
+    }
+  ],
+  "next_before": "ISO or null"
+}
+```
+- `user_id` 클라이언트에 미노출
+- 로그인 시 각 답변에 `ref` (10분 유효, 대화 요청에 사용)
+
+### POST /questions/:id/answers/:answerId/chat
+응답: `201` (대화 요청 발송, matching과 동일한 응답 형태)
+오류: `400 SELF_CHAT`, `404 NOT_FOUND`, `409 TARGET_OFFLINE` 등
 
 ## Safety — #16
 | Method | Path | 인증 | 설명 |

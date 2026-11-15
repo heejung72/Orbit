@@ -105,6 +105,13 @@ async function redisMatches(key) {
     .map((m) => ({ ...m, similarity: Number(m.similarity), commonTagIds: JSON.parse(m.commonTagIds || '[]') }));
 }
 
+// meKey, targetKey, score(float), common(int[]) → ref 문자열 (Redis에 TTL 10분으로 저장)
+async function issueRef(meKey, targetKey, score, common) {
+  const ref = crypto.randomBytes(18).toString('base64url');
+  await getRedis().set(refKey(ref), JSON.stringify({ owner: meKey, target: targetKey, score, common }), { PX: REF_TTL_MS });
+  return ref;
+}
+
 // 추천·요청할 수 없는 상대 → Map(actorKey → 이유)
 // blocked: 차단(양방향) / room: 대화 중인 1:1 / sent·received: 대기 중 요청 / rejected: 24시간 안의 거절
 async function unavailablePartners(me) {
@@ -443,6 +450,7 @@ async function removeGuestMatches(guestId) {
 module.exports = {
   commonTags,
   getVectors,
+  issueRef,
   getCandidates,
   createRequest,
   acceptRequest,
