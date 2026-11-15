@@ -52,6 +52,10 @@ export default function RootNavigator({ isLoggedIn, isGuest, needsTaste, orbitEx
           {needsTaste ? [taste, main] : [main, taste]}
           <Stack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ title: '채팅' }} />
           <Stack.Screen name="Matching" component={MatchingScreen} options={{ title: '사람 만나기' }} />
+          {/* Guest → 회원 전환 (#14): 같은 가입 화면을 닉네임·캐릭터를 미리 채워서 */}
+          <Stack.Screen name="Upgrade" options={{ title: '회원가입' }}>
+            {props => <RegisterScreen {...props} onLogin={onLogin} upgrade />}
+          </Stack.Screen>
           <Stack.Screen name="LoungeChat" component={LoungeChatScreen} options={{ title: '라운지' }} />
           <Stack.Screen name="TodayQuestion" component={TodayQuestionScreen} options={{ title: '오늘의 질문' }} />
         </>

@@ -9,7 +9,7 @@ import { colors, spacing, radius, typography } from '../../theme';
 
 // My Orbit (#17)
 // 회원: 캐릭터·닉네임 편집, 취향 요약·편집, 계정(이메일, 로그아웃, 탈퇴)
-// Guest: 캐릭터·닉네임(변경 불가), 남은 시간, 취향 편집, 둘러보기 끝내기 — 가입 버튼은 #14
+// Guest: 캐릭터·닉네임(변경 불가), 남은 시간, 취향 편집, 가입하고 이어가기(#14), 둘러보기 끝내기
 const messageOf = (err) => (err instanceof TypeError ? '서버에 연결할 수 없어요' : err.message);
 
 function Section({ title, action, onAction, children }) {
@@ -189,7 +189,10 @@ export default function MyOrbitScreen({ navigation, isGuest, onLogout }) {
 
       {isGuest ? (
         <Section title="둘러보기">
-          <Text style={styles.muted}>둘러보기를 끝내면 임시 닉네임·취향·대화가 바로 정리돼요.</Text>
+          <Text style={styles.muted}>가입하면 취향·라운지·대화가 그대로 옮겨지고, 둘러보기를 끝내면 바로 정리돼요.</Text>
+          <Pressable style={[styles.wide, styles.primary]} onPress={() => navigation.navigate('Upgrade')} accessibilityRole="button">
+            <Text style={[styles.buttonText, styles.primaryText]}>가입하고 이어가기</Text>
+          </Pressable>
           <Pressable style={[styles.wide, styles.outline, busy && styles.disabled]} onPress={endBrowsing} disabled={busy} accessibilityRole="button">
             <Text style={[styles.buttonText, styles.outlineText]}>둘러보기 끝내기</Text>
           </Pressable>

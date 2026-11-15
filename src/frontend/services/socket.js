@@ -9,11 +9,15 @@ import { secureStorage } from './storage';
 const ACK_TIMEOUT_MS = 5000;
 const RETRY_MS = 3000;
 let socket = null;
+// 화면 구독(subscribe)은 소켓이 새로 만들어져도 유지한다 — 가입 전환(#14) 때 Guest 소켓을 끊고 회원으로 다시 연결해도
+// 열려 있던 채팅방이 메시지를 계속 받게
+const listeners = new Map(); // event → Set(handler)
 
 // 회원은 JWT, Guest는 guestToken으로 연결
 // 세션이 끝나면 onSessionExpired('guest' | 'member'), Guest 만료 5분 전이면 onGuestWarning({ remainingSec })
 // 매칭(#13): 대화 요청을 받으면 onMatchRequest(request), 수락되면 onMatchAccepted({ matchId, roomId, title })
-export async function connectSocket({ onSessionExpired, onGuestWarning, onMatchRequest, onMatchAccepted } = {}) {
+// 가입 유도(#14): Guest 메시지 20개째에 onSignupNudge({ reason })
+export async function connectSocket({ onSessionExpired, onGuestWarning, onMatchRequest, onMatchAccepted, onSignupNudge } = {}) {
   disconnectSocket();
   const token = await secureStorage.get('token');
   const guestToken = token ? null : await secureStorage.get('guestToken');
@@ -24,6 +28,8 @@ export async function connectSocket({ onSessionExpired, onGuestWarning, onMatchR
   s.on('guest:warning', (w) => onGuestWarning?.(w));
   s.on('match:request', (r) => onMatchRequest?.(r));
   s.on('match:accepted', (a) => onMatchAccepted?.(a));
+  s.on('signup:nudge', (n) => onSignupNudge?.(n));
+  for (const [event, handlers] of listeners) for (const handler of handlers) s.on(event, handler);
   s.on('connect_error', (err) => {
     const code = err.data?.code;
     if (code === 'GUEST_EXPIRED') return onSessionExpired?.('guest');
@@ -58,7 +64,11 @@ export const sendTyping = (roomId) => socket?.emit('typing', { roomId });
 
 // 이벤트 구독, 해제 함수를 돌려준다 (message:new, typing, connect …)
 export function subscribe(event, handler) {
-  const s = socket;
-  s?.on(event, handler);
-  return () => s?.off(event, handler);
+  if (!listeners.has(event)) listeners.set(event, new Set());
+  listeners.get(event).add(handler);
+  socket?.on(event, handler);
+  return () => {
+    listeners.get(event)?.delete(handler);
+    socket?.off(event, handler);
+  };
 }

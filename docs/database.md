@@ -46,6 +46,7 @@ erDiagram
         int avatar_id FK
         varchar status
         int report_count
+        uuid upgraded_from_guest UK
     }
     user_tastes {
         uuid user_id PK
@@ -104,7 +105,7 @@ erDiagram
 | 테이블 | 용도 | 주요 제약 / 비고 | 관련 이슈 |
 |---|---|---|---|
 | `avatars` | 기본 캐릭터 6종 (code, emoji, color) | `code` UNIQUE. 커스터마이징은 V2 | #4, #17 |
-| `users` | 회원 | `email` UNIQUE, `status` ∈ active/warned/suspended/banned, `avatar_id` 기본 1 | #4 |
+| `users` | 회원 | `email` UNIQUE, `status` ∈ active/warned/suspended/banned, `avatar_id` 기본 1. `upgraded_from_guest` UNIQUE: Guest에서 전환한 회원의 원래 guestId — 같은 Guest를 두 번 옮기지 않는 최종 방어선 (002, #14) | #4, #14 |
 | `taste_categories` | 7개 카테고리 | `code` UNIQUE (music, movie, book, food, travel, sports, hobby) | #7 |
 | `taste_tags` | 카테고리별 세부 태그 | (category_id, name) UNIQUE | #7 |
 | `user_tastes` | 회원 취향 + 중요도 | PK(user_id, tag_id), `weight` 1~3 (3 매우 좋아함 / 2 좋아함 / 1 관심) | #7, #13 |

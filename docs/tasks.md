@@ -22,10 +22,10 @@
 | 11 | [FEAT] 취향 라운지 | `feat/#11-lounge` | 10 | ✅ |
 | 12 | [FEAT] Guest Time Attack | `feat/#12-guest-time-attack` | 5, 10 | ✅ |
 | 13 | [FEAT] 1:1 취향 매칭 | `feat/#13-matching` | 7, 10 | ✅ |
-| 14 | [FEAT] Guest → 회원 전환 | `feat/#14-guest-upgrade` | 12, 13 | ⬜ |
+| 14 | [FEAT] Guest → 회원 전환 | `feat/#14-guest-upgrade` | 12, 13 | 🟨 PR |
 | 15 | [FEAT] 오늘의 질문 | `feat/#15-today-question` | 8, 13 | ⬜ |
 | 16 | [FEAT] 신고·차단, 비속어 필터·스팸 Rate Limit | `feat/#16-safety` | 10 | ⬜ |
-| 17 | [FEAT] My Orbit | `feat/#17-my-orbit` | 7, 9 | 🟨 PR |
+| 17 | [FEAT] My Orbit | `feat/#17-my-orbit` | 7, 9 | ✅ |
 
 **권장 진행 순서:** 1 → 2 → 3 → **5 → 4** → 6 → **7 → 8** → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17
 
@@ -261,11 +261,15 @@
 - 하지 않은 것: 오프라인 회원 후보 → V2 / Guest 차단·신고, 매칭 Rate Limit → #16 / 가입 시 Redis 방 이전 → #14 / 카테고리 가중치 → 필요 시 / 푸시 알림 → V2 / 보낸 요청 취소 → 필요 시
 
 ## #14 [FEAT] Guest → 회원 전환
-- [ ] `SignupNudgeModal` (3가지 트리거: 기록 저장 버튼 / 만료 5분 전 / 메시지 20개)
-- [ ] Register에 `X-Guest-Token` 전달
-- [ ] `services/migration` 트랜잭션 ([system_design.md §4-4](./system_design.md)): 취향·방·답변 이전, 메시지는 **본인 것만** 새 userId로, Member 메시지 작성자 유지, 상대 Guest 메시지는 이전 X
-- [ ] 소켓 재인증 `auth:upgrade`, 상대 화면 닉네임 유지
-- [ ] 상대도 Guest인 방의 처리 방식 결정 후 문서 반영
+- [x] Guest 메시지 수(`guest:msgcount`) + 20개째 `signup:nudge` 1회
+- [x] `services/guestUpgrade.js`: 가입과 한 트랜잭션으로 취향·라운지 참여·본인 라운지 메시지·회원과의 1:1 방(같은 roomId, 메시지 순서·작성자 유지) 이전 ([system_design.md §4-4](./system_design.md))
+- [x] Guest끼리 방은 Redis에 두고 참여자·작성자 키만 회원으로 (Lua), 방 만료는 남은 Guest 시각으로
+- [x] `POST /auth/register` + `X-Guest-Token`: 선점(동시 가입 1번만), 실패 시 전체 롤백, 커밋 후 토큰 무효·Redis 정리·Guest 소켓 종료
+- [x] `tests/guestUpgrade.e2e.js` 13개 (`npm run test:upgrade`)
+- [x] `SignupNudgeModal` + 3가지 트리거(채팅방 "대화 저장하기" / 만료 5분 전 / 메시지 20개), My Orbit(Guest) "가입하고 이어가기" — 5분 전 배너(`GuestWarningBanner`)는 모달로 대체
+- [x] 가입 화면 미리 채움(닉네임·캐릭터), 화면 안 오류(Alert 제거), 가입 후 회원 세션·소켓 재연결, 채팅방으로 복귀
+- [x] 소켓 구독을 소켓 교체 후에도 유지, ChatRoom 입장 → 기록 순서로 바꿔 그사이 메시지 누락 방지
+- 하지 않은 것: 오늘의 질문 답변 이전 → #15 / 이메일 인증 → MVP 이후 / 소셜 로그인 → V2 / 대기 중인 매칭 요청 이전(가입 후 다시 매칭)
 
 ## #15 [FEAT] 오늘의 질문
 - [ ] seed 질문 순환 (publish_date 기준, 없으면 순번)

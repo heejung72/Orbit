@@ -5,6 +5,7 @@ import { joinRoom, leaveRoom, sendMessage, sendTyping, subscribe } from '../../s
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Avatar from '../../components/Avatar';
 import GuestTimer from '../../components/GuestTimer';
+import { openSignupNudge } from '../../services/signupNudge';
 import { colors, spacing, radius, typography } from '../../theme';
 
 // 채팅방 (1:1·라운지 공통): 기록 + 실시간 메시지, 입력 중 표시, 1:1 나가기, 1:1 대화 주제 카드(#13)
@@ -30,18 +31,20 @@ export default function ChatRoomScreen({ route, navigation }) {
   const typingTimer = useRef(null);
   const mounted = useRef(true); // 기록 조회 중에 화면을 떠나면 그 뒤에 방에 입장하지 않도록
 
-  // 기록 다시 불러오기 + 방 입장 (처음, 그리고 재연결될 때마다 — 서버는 재연결 시 방 정보를 잃는다)
+  // 방 입장 + 기록 다시 불러오기 (처음, 그리고 재연결될 때마다 — 서버는 재연결 시 방 정보를 잃는다)
+  // 입장을 먼저 해야 기록 조회와 입장 사이에 온 메시지를 놓치지 않는다. 그사이 실시간으로 받은 메시지는 기록과 합친다
   const enterRoom = useCallback(async () => {
-    try {
-      const history = await api.getMessages(roomId);
-      if (mounted.current) setMessages(history);
-    } catch (err) {
-      if (mounted.current) setError(err instanceof TypeError ? '서버에 연결할 수 없어요' : err.message);
-    }
-    if (!mounted.current) return; // 정리 함수가 이미 leaveRoom을 보냈다면 다시 입장하지 않는다
     const res = await joinRoom(roomId);
     if (!mounted.current) return leaveRoom(roomId); // 입장 응답 전에 떠났으면 바로 퇴장
     if (!res.ok) setError(res.message);
+    try {
+      const history = await api.getMessages(roomId);
+      if (!mounted.current) return;
+      const ids = new Set(history.map((m) => m.id));
+      setMessages((prev) => [...history, ...prev.filter((m) => !ids.has(m.id))]);
+    } catch (err) {
+      if (mounted.current) setError(err instanceof TypeError ? '서버에 연결할 수 없어요' : err.message);
+    }
   }, [roomId]);
 
   useEffect(() => {
@@ -164,6 +167,9 @@ export default function ChatRoomScreen({ route, navigation }) {
       {guestExpiresAt && (
         <View style={styles.guestBar}>
           <GuestTimer expiresAt={guestExpiresAt} />
+          <Pressable onPress={() => openSignupNudge('save')} accessibilityRole="button" hitSlop={spacing.sm}>
+            <Text style={styles.saveLink}>대화 저장하기</Text>
+          </Pressable>
         </View>
       )}
       {showTopics && topics.length > 0 && (
@@ -251,7 +257,11 @@ const styles = StyleSheet.create({
   topicsClose: { ...typography.caption, color: colors.textMuted },
   topic: { borderWidth: 1, borderColor: colors.primary, borderRadius: radius.lg, paddingVertical: spacing.xs, paddingHorizontal: spacing.md, alignSelf: 'flex-start' },
   topicText: { ...typography.caption, color: colors.primary },
-  guestBar: { alignItems: 'center', paddingVertical: spacing.xs, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
+  guestBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.md, paddingVertical: spacing.xs,
+    backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  saveLink: { ...typography.caption, color: colors.primary, fontWeight: 'bold' },
   presence: {
     ...typography.caption, color: colors.primary, textAlign: 'center', paddingVertical: spacing.xs,
     backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border,
