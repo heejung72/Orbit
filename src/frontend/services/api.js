@@ -95,6 +95,15 @@ export const api = {
   joinLounge: (id) => request(`/lounges/${id}/join`, { method: 'POST' }),
   leaveLounge: (id) => request(`/lounges/${id}/leave`, { method: 'DELETE' }),
 
+  // 오늘의 질문 (#15)
+  getTodayQuestion: () => request('/questions/today'),
+  submitAnswer: (questionId, answer) =>
+    request(`/questions/${questionId}/answers`, { method: 'POST', body: JSON.stringify({ answer }) }),
+  getAnswers: (questionId, before = null) =>
+    request(`/questions/${questionId}/answers${before ? `?before=${before}` : ''}`),
+  chatWithAnswerer: (questionId, answerId) =>
+    request(`/questions/${questionId}/answers/${answerId}/chat`, { method: 'POST' }),
+
   // 신고/차단
   report: (reported_id, reason, description) =>
     request('/reports', { method: 'POST', body: JSON.stringify({ reported_id, reason, description }) }),
